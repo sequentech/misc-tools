@@ -55,9 +55,8 @@ def getTallyData(mypeerpkg):
     return {
         # 'election_id': electionId,
         "callback_url": "http://" + localServer + ":" + str(localPort) + "/receive_tally",
-        "extra": [],
         "votes_url": "http://" + localServer + ":" + str(localPort) + "/",
-        "votes_hash": "sha512://"
+        "votes_hash": "ni:///sha-256;"
     }
 
 
@@ -122,29 +121,38 @@ def grabAuthData(eopeers_dir, mypeerpkg, eopeers):
 def getStartData(eopeers_dir, mypeerpkg, eopeers):
     mypeerpkg = getPeerPkg(mypeerpkg)
     return {
-        # "election_id": electionId,
-        "is_recurring": False,
         "callback_url": "http://" + mypeerpkg["hostname"] + ":" + str(localPort) + "/key_done",
-        "extra": [],
         "title": "Test election",
-        "url": "https://example.com/election/url",
         "description": "election description",
-        "questions_data": [{
-            "question": "Who Should be President?",
-            "tally_type": "ONE_CHOICE",
-            # "answers": ["Alice", "Bob"],
+        'presentation': {},
+        "questions": [{
+            "title": "Who Should be President?",
+            "tally_type": "plurality-at-large",
+            "randomize_answer_order": True,
+            'num_winners': 1,
+            "answer_total_votes_percentage": "over-total-valid-votes",
+            'layouy': 'plurality',
             "answers": [
-                {'a': 'ballot/answer',
-                'details': '',
-                'value': 'Alice'},
-                {'a': 'ballot/answer',
-                'details': '',
-                'value': 'Bob'}
+                {
+                    'details': '',
+                    'text': 'Alice',
+                    'id': 0,
+                    'category': '',
+                    'sort_order': 0,
+                    'urls': [],
+                },
+                {
+                  'id': 1,
+                  'category': '',
+                  'sort_order': 1,
+                  'urls': [],
+                  'text': 'Bob'
+                }
             ],
             "max": 1, "min": 0
         }],
-        "voting_start_date": "2013-12-06T18:17:14.457000",
-        "voting_end_date": "2013-12-09T18:17:14.457000",
+        "start_date": "2013-12-06T18:17:14.457000",
+        "end_date": "2013-12-09T18:17:14.457000",
         "authorities": grabAuthData(eopeers_dir, mypeerpkg, eopeers)
     }
 
@@ -184,29 +192,29 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
 # misc\utils.py
 BUF_SIZE = 10*1024
+from functools import partial
+from base64 import urlsafe_b64encode
+
 def hash_file(file_path):
     '''
     Returns the hexdigest of the hash of the contents of a file, given the file
     path.
     '''
-    hash = hashlib.sha512()
+    hash = hashlib.sha256()
     f = open(os.path.join(DATA_DIR, file_path), 'r')
-    for chunk in f.read(BUF_SIZE):
+    for chunk in iter(partial(f.read, BUF_SIZE), b''):
         hash.update(chunk)
     f.close()
-    return hash.hexdigest()
+    return urlsafe_b64encode(hash.digest())
 
 def writeVotes(votesData, fileName):
     # forms/election.py:save
     votes = []
     for vote in votesData:
         data = {
-            "a": "encrypted-vote-v1",
             "proofs": [],
             "choices": [],
-            "voter_username": 'foo',
-            "issue_date": str(datetime.now()),
-            "election_hash": {"a": "hash/sha256/value", "value": "foobar"},
+            "issue_date": str(datetime.now())
         }
 
         q_answer = vote['question0']
@@ -228,9 +236,6 @@ def writeVotes(votesData, fileName):
             # votes_file.write(json.dumps(vote['data'], sort_keys=True) + "\n")
             votes_file.write(json.dumps(vote, sort_keys=True) + "\n")
 
-    # hash = hash_file(fileName)
-
-    # return hash
 
 def startServer(port):
     print("> Starting server on port " + str(port))
@@ -240,7 +245,7 @@ def startServer(port):
     thread.start()
 
 def startElection(electionId, url, data):
-    data['election_id'] = electionId
+    data['id'] = electionId
     print("> Creating election " + electionId)
     cv.done = False
     r = requests.post(url, data=json.dumps(data), verify=False, cert=(CERT, KEY))
@@ -275,6 +280,8 @@ def doTally(electionId, url, data, votesFile, hash):
     cv.done = False
     r = requests.post(url, data=json.dumps(data), verify=False, cert=(CERT, KEY))
     print("> " + str(r))
+    if r.status_code == 400:
+        print("> error:" + str(r.text))
 
 def waitForTally():
     start = time.time()
@@ -352,12 +359,7 @@ def encrypt(args):
             votes = []
 
             for line in lines:
-                fields = {
-                    "is_vote_secret":True,"action":
-                    "vote",
-                    "issue_date":str(datetime.now()),
-                    "unique_randomness":"foo",
-                }
+                fields = {}
                 lineJson = json.loads(line)
                 lineJson["commitment"] = "foo"
                 lineJson["response"] = "foo"
