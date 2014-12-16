@@ -24,6 +24,7 @@ import codecs
 import re
 import os
 import operator
+import argparse
 from datetime import datetime, timedelta
 
 def csv_to_blocks(path, separator=",", strip_values=True):
@@ -150,10 +151,14 @@ def serialize(data):
     return json.dumps(data,
         indent=4, ensure_ascii=False, sort_keys=True, separators=(',', ': '))
 
-def blocks_to_election(blocks):
+def blocks_to_election(blocks, config_path):
     '''
     Parses a list of blocks into an election
     '''
+    config = None
+    with open(config_path, mode='r', encoding="utf-8", errors='strict') as f:
+        config = json.loads(f.read())
+
     # convert blocks into a more convenient structure
     election = blocks[0]['values']
     blocks.pop(0)
@@ -194,52 +199,55 @@ def blocks_to_election(blocks):
 
 
     start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M")
-    return {
-      "id": election['Id'],
-      "title": election['Title'],
-      "description": election['Description'],
-      "director": "wadobo-auth1",
-      "authorities": "openkratio-authority",
-      "layout": election['Layout'],
-      "presentation": {
-        "share_text": election['Share Text'],
-        "theme": election['Theme'],
-        "urls": [],
-        "theme_css": ""
-      },
-      "end_date": (start_date + timedelta(hours=int(election['Duration in hours']))).isoformat(),
-      "start_date": start_date.isoformat(),
-      "questions": questions
-  }
+    ret = config
+    ret.update({
+        "id": int(election['Id']),
+        "title": election['Title'],
+        "description": election['Description'],
+        "layout": election['Layout'],
+        "presentation": {
+            "share_text": election['Share Text'],
+            "theme": election['Theme'],
+            "urls": [],
+            "theme_css": ""
+        },
+        "end_date": (start_date + timedelta(hours=int(election['Duration in hours']))).isoformat(),
+        "start_date": start_date.isoformat(),
+        "questions": questions
+    })
+    return ret
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-      print("Usage: %s <input.tsv> <output-election.json>" % sys.argv[0])
-      exit(1)
+    parser = argparse.ArgumentParser(description='Converts a CSV into the json to create an election.')
+    parser.add_argument('-c', '--config-path', help='default config for the election')
+    parser.add_argument('-i', '--input-path', help='input file')
+    parser.add_argument('-o', '--output-path', help='output file')
 
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
+    args = parser.parse_args()
 
-    if not os.access(input_file, os.R_OK):
-      print("can't read %s" % input_file)
+    if not os.access(args.input_path, os.R_OK):
+      print("can't read %s" % args.input_path)
       exit(2)
-    if not os.access(input_file, os.W_OK):
+    if not os.access(args.input_path, os.W_OK):
       print("can't write to %s" % output_file)
-      exit(3)
+      exit(2)
+    if not os.access(args.config_path, os.R_OK):
+      print("can't read %s" % args.config_path)
+      exit(2)
 
-    blocks = csv_to_blocks(path=input_file, separator="\t")
+    blocks = csv_to_blocks(path=args.input_path, separator="\t")
 
     print(serialize(blocks))
 
     try:
-        election = blocks_to_election(blocks)
+        election = blocks_to_election(blocks, args.config_path)
     except:
         print("malformed CSV")
         import traceback
         traceback.print_exc()
-        exit(1)
+        exit(3)
 
     print(serialize(election))
 
-    with open(output_file, mode='w', encoding="utf-8", errors='strict') as f:
+    with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
         f.write(serialize(election))
