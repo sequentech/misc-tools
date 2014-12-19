@@ -444,9 +444,9 @@ full: does the whole process''')
     command = args.command[0]
     if hasattr(__main__, command):
         if(command == 'create') or (command == 'full'):
-            args.electionId = str(time.time()).replace(".", "")
+            args.electionId = int(time.time()).replace(".", "")
         elif(len(args.command) == 2):
-            args.electionId = args.command[1]
+            args.electionId = int(args.command[1])
         else:
             parser.print_help()
             exit(1)
