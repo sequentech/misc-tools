@@ -27,6 +27,8 @@ import operator
 import argparse
 from datetime import datetime, timedelta
 
+DEFAULT_CATEGORY = 'Candidaturas no agrupadas'
+
 def csv_to_blocks(path, separator=",", strip_values=True):
     '''
     Converts a CSV file into a list of dictionaries provided that the CSV
@@ -95,9 +97,11 @@ def csv_to_blocks(path, separator=",", strip_values=True):
         # main loop
         for line in f:
             # get values
-            values = line.split(separator)
+            # to be safe, append some extra elements to the end of the list
+            values = line.split(separator) + ["" for _ in range(10)]
             if strip_values:
                 values = [val.strip() for val in values]
+
 
             # check for new blocks
             if new_block_flag:
@@ -137,7 +141,9 @@ def csv_to_blocks(path, separator=",", strip_values=True):
                         current_block['values'][key] = values[1]
                 elif current_block['type'] == "Table":
                     if headers == None:
-                        headers = values
+                        # as we addeed some extra empty elements to the values,
+                        # we use here split again
+                        headers = line.split(separator)
                     else:
                         current_block['values'].append(
                           dict((key, value)
@@ -170,9 +176,9 @@ def blocks_to_election(blocks, config_path):
         data = {
             "description": q["Description"],
             "layout": q["Layout"],
-            "max": q["Maximum choices"],
-            "min": q["Minimum choices"],
-            "num_winners": q["Number of winners"],
+            "max": int(q["Maximum choices"]),
+            "min": int(q["Minimum choices"]),
+            "num_winners": int(q["Number of winners"]),
             "title": q["Title"],
             "randomize_answer_order": q["Randomize options order"] == "TRUE",
             "tally_type": q["Voting system"],
@@ -180,7 +186,7 @@ def blocks_to_election(blocks, config_path):
             "answers": [
               {
                   "id": int(answer["Id"]),
-                  "category": answer["Category"],
+                  "category": answer.get("Category", DEFAULT_CATEGORY),
                   "details": "",
                   "sort_order": index,
                   "urls": [],
@@ -192,6 +198,8 @@ def blocks_to_election(blocks, config_path):
         }
         # check answers
         assert len(data['answers']) == len(set(map(operator.itemgetter('text'), data['answers'])))
+        data['max'] = min(data['max'], len(data['answers']))
+        data['num_winners'] = min(data['num_winners'], len(data['answers']))
         for answ in data['answers']:
             assert answ['id'] == answ['sort_order']
 
