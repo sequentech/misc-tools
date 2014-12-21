@@ -228,34 +228,55 @@ def blocks_to_election(blocks, config_path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Converts a CSV into the json to create an election.')
     parser.add_argument('-c', '--config-path', help='default config for the election')
-    parser.add_argument('-i', '--input-path', help='input file')
-    parser.add_argument('-o', '--output-path', help='output file')
+    parser.add_argument('-i', '--input-path', help='input file or directory')
+    parser.add_argument('-o', '--output-path', help='output file or directory')
 
     args = parser.parse_args()
 
     if not os.access(args.input_path, os.R_OK):
       print("can't read %s" % args.input_path)
       exit(2)
-    if not os.access(args.input_path, os.W_OK):
-      print("can't write to %s" % output_file)
+    if not os.access(args.output_path, os.W_OK):
+      print("can't write to %s" % args.output_path)
       exit(2)
     if not os.access(args.config_path, os.R_OK):
       print("can't read %s" % args.config_path)
       exit(2)
 
-    blocks = csv_to_blocks(path=args.input_path, separator="\t")
+    if os.path.isdir(args.input_path) and os.path.isdir(args.output_path):
+        for fname in os.listdir(args.input_path):
+            full_path = os.path.join(args.input_path, fname)
+            if os.path.isdir(full_path):
+                continue
 
-    print(serialize(blocks))
+            blocks = csv_to_blocks(path=full_path, separator="\t")
+            try:
+                election = blocks_to_election(blocks, args.config_path)
+            except:
+                print("malformed CSV")
+                import traceback
+                traceback.print_exc()
 
-    try:
-        election = blocks_to_election(blocks, args.config_path)
-    except:
-        print("malformed CSV")
-        import traceback
-        traceback.print_exc()
-        exit(3)
+            with open(
+                os.path.join(args.output_path, fname.replace(".tsv", ".json")),
+                mode='w',
+                encoding="utf-8",
+                errors='strict') as f:
+              f.write(serialize(election))
+    else:
+        blocks = csv_to_blocks(path=args.input_path, separator="\t")
 
-    print(serialize(election))
+        print(serialize(blocks))
 
-    with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
-        f.write(serialize(election))
+        try:
+            election = blocks_to_election(blocks, args.config_path)
+        except:
+            print("malformed CSV")
+            import traceback
+            traceback.print_exc()
+            exit(3)
+
+        print(serialize(election))
+
+        with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
+            f.write(serialize(election))
