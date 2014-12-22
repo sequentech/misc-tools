@@ -157,13 +157,10 @@ def serialize(data):
     return json.dumps(data,
         indent=4, ensure_ascii=False, sort_keys=True, separators=(',', ': '))
 
-def blocks_to_election(blocks, config_path):
+def blocks_to_election(blocks, config):
     '''
     Parses a list of blocks into an election
     '''
-    config = None
-    with open(config_path, mode='r', encoding="utf-8", errors='strict') as f:
-        config = json.loads(f.read())
 
     # convert blocks into a more convenient structure
     election = blocks[0]['values']
@@ -219,8 +216,8 @@ def blocks_to_election(blocks, config_path):
             "urls": [],
             "theme_css": ""
         },
-        "end_date": (start_date + timedelta(hours=int(election['Duration in hours']))).isoformat(),
-        "start_date": start_date.isoformat(),
+        "end_date": (start_date + timedelta(hours=int(election['Duration in hours']))).isoformat() + ".000",
+        "start_date": start_date.isoformat() + ".000",
         "questions": questions
     })
     return ret
@@ -243,6 +240,10 @@ if __name__ == '__main__':
       print("can't read %s" % args.config_path)
       exit(2)
 
+    config = None
+    with open(args.config_path, mode='r', encoding="utf-8", errors='strict') as f:
+        config = json.loads(f.read())
+
     if os.path.isdir(args.input_path) and os.path.isdir(args.output_path):
         for fname in os.listdir(args.input_path):
             full_path = os.path.join(args.input_path, fname)
@@ -251,25 +252,33 @@ if __name__ == '__main__':
 
             blocks = csv_to_blocks(path=full_path, separator="\t")
             try:
-                election = blocks_to_election(blocks, args.config_path)
+                election = blocks_to_election(blocks, config)
             except:
                 print("malformed CSV")
                 import traceback
                 traceback.print_exc()
 
             with open(
-                os.path.join(args.output_path, fname.replace(".tsv", ".json")),
-                mode='w',
-                encoding="utf-8",
-                errors='strict') as f:
-              f.write(serialize(election))
+                    os.path.join(args.output_path, fname.replace(".tsv", ".config.json")),
+                    mode='w',
+                    encoding="utf-8",
+                    errors='strict') as f:
+                f.write(serialize(election))
+
+            if config.get('agora_results_config', None) is not None:
+                with open(
+                        os.path.join(args.output_path, fname.replace(".tsv", ".config.results.json")),
+                        mode='w',
+                        encoding="utf-8",
+                        errors='strict') as f:
+                    f.write(serialize(config['agora_results_config']))
     else:
         blocks = csv_to_blocks(path=args.input_path, separator="\t")
 
         print(serialize(blocks))
 
         try:
-            election = blocks_to_election(blocks, args.config_path)
+            election = blocks_to_election(blocks, config)
         except:
             print("malformed CSV")
             import traceback
