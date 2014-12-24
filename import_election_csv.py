@@ -27,7 +27,6 @@ import operator
 import argparse
 from datetime import datetime, timedelta
 
-DEFAULT_CATEGORY = 'Candidaturas no agrupadas'
 
 def csv_to_blocks(path, separator=",", strip_values=True):
     '''
@@ -136,7 +135,7 @@ def csv_to_blocks(path, separator=",", strip_values=True):
             # process blocks
             elif current_block is not None:
                 if current_block["type"] == "Form":
-                    key = values[0]
+                    key = values[0].strip()
                     if len(key) != 0:
                         current_block['values'][key] = values[1]
                 elif current_block['type'] == "Table":
@@ -146,8 +145,8 @@ def csv_to_blocks(path, separator=",", strip_values=True):
                         headers = line.split(separator)
                     else:
                         current_block['values'].append(
-                          dict((key, value)
-                              for key, value in zip(headers, values) if len(key) > 0))
+                          dict((key.strip(), value)
+                              for key, value in zip(headers, values) if len(key.strip()) > 0))
 
         if current_block is not None:
             ret.append(current_block)
@@ -183,7 +182,7 @@ def blocks_to_election(blocks, config):
             "answers": [
               {
                   "id": int(answer["Id"]),
-                  "category": answer.get("Category", DEFAULT_CATEGORY),
+                  "category": answer["Category"],
                   "details": "",
                   "sort_order": index,
                   "urls": [],
@@ -216,8 +215,8 @@ def blocks_to_election(blocks, config):
             "urls": [],
             "theme_css": ""
         },
-        "end_date": (start_date + timedelta(hours=int(election['Duration in hours']))).isoformat() + ".000",
-        "start_date": start_date.isoformat() + ".000",
+        "end_date": (start_date + timedelta(hours=int(election['Duration in hours']))).isoformat() + ".001",
+        "start_date": start_date.isoformat() + ".001",
         "questions": questions
     })
     return ret
