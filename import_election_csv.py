@@ -156,7 +156,7 @@ def serialize(data):
     return json.dumps(data,
         indent=4, ensure_ascii=False, sort_keys=True, separators=(',', ': '))
 
-def blocks_to_election(blocks, config):
+def blocks_to_election(blocks, config, add_to_id=0):
     '''
     Parses a list of blocks into an election
     '''
@@ -205,7 +205,7 @@ def blocks_to_election(blocks, config):
     start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M")
     ret = config
     ret.update({
-        "id": int(election['Id']),
+        "id": int(election['Id']) + add_to_id,
         "title": election['Title'],
         "description": election['Description'],
         "layout": election['Layout'],
@@ -226,6 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--config-path', help='default config for the election')
     parser.add_argument('-i', '--input-path', help='input file or directory')
     parser.add_argument('-o', '--output-path', help='output file or directory')
+    parser.add_argument('-a', '--add-to-id', type=int, help='add an int number to the id')
 
     args = parser.parse_args()
 
@@ -251,7 +252,8 @@ if __name__ == '__main__':
 
             blocks = csv_to_blocks(path=full_path, separator="\t")
             try:
-                election = blocks_to_election(blocks, config)
+                election = blocks_to_election(blocks, config, args.add_to_id)
+                fname = fname.replace(str(election["id"] - args.add_to_id), str(election["id"]))
             except:
                 print("malformed CSV")
                 import traceback
