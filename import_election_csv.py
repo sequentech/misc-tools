@@ -255,7 +255,7 @@ if __name__ == '__main__':
                 election = blocks_to_election(blocks, config, args.add_to_id)
                 fname = fname.replace(str(election["id"] - args.add_to_id), str(election["id"]))
             except:
-                print("malformed CSV")
+                print("malformed CSV, %s" % fname)
                 import traceback
                 traceback.print_exc()
 
