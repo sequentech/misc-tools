@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# This file is part of agora-api.
+# This file is part of agora-tools.
 # Copyright (C) 2014 Eduardo Robles Elvira <edulix AT agoravoting DOT com>
 
 # This program is free software: you can redistribute it and/or modify
@@ -226,7 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--config-path', help='default config for the election')
     parser.add_argument('-i', '--input-path', help='input file or directory')
     parser.add_argument('-o', '--output-path', help='output file or directory')
-    parser.add_argument('-a', '--add-to-id', type=int, help='add an int number to the id')
+    parser.add_argument('-a', '--add-to-id', type=int, help='add an int number to the id', default=0)
 
     args = parser.parse_args()
 
@@ -258,6 +258,7 @@ if __name__ == '__main__':
                 print("malformed CSV, %s" % fname)
                 import traceback
                 traceback.print_exc()
+                continue
 
             with open(
                     os.path.join(args.output_path, fname.replace(".tsv", ".config.json")),
