@@ -264,8 +264,10 @@ def find_answer_mappings(hashed_election_configs, ancestors, dest_answer, dest_q
         "source_election_id": 0,
         "source_question_num": 0,
         "source_answer_id": 1
+        "source_answer_text": "whatever",
         "dest_question_num": 0,
         "dest_answer_id": 1
+        "dest_answer_text": "whatever"
       },
       ...
     ]
@@ -277,12 +279,17 @@ def find_answer_mappings(hashed_election_configs, ancestors, dest_answer, dest_q
         for question, question_num in zip(questions, range(len(questions))):
             for answer in question['answers']:
                 if answer['hash'] == dest_answer['hash']:
+                    if answer['text'] != dest_answer['text']:
+                        print("WARNING: answer mapping for different texts: (source, dest) = ('%s', '%s')" % (
+                            answer['text'], dest_answer['text']))
                     answer_mappings.append({
                         "source_election_id": int(ancestor),
                         "source_question_num": question_num,
                         "source_answer_id": answer['id'],
+                        "source_answer_text": answer['text'],
                         "dest_question_num": dest_question_num,
-                        "dest_answer_id": dest_answer['id']
+                        "dest_answer_id": dest_answer['id'],
+                        "dest_answer_text": dest_answer['text']
                     })
     return answer_mappings
 
