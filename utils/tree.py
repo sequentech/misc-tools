@@ -90,3 +90,17 @@ def list_all(tree, edges):
     for key, val in tree.items():
         edges.append(key)
         list_all(val, edges)
+
+def get_ancestors(tree, edge, ancestors=[]):
+    '''
+    Given a tree and an edge, returns a list with the ancestors. The list is
+    sorted so that the first ancestor is the root (no parent).
+    '''
+    for key, val in tree.items():
+        if key == edge:
+            return ancestors
+        else:
+            final_ancestors = get_ancestors(val, edge, ancestors + [key])
+            if len(final_ancestors) > 0:
+                return final_ancestors
+    return []

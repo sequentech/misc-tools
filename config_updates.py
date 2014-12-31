@@ -22,13 +22,16 @@ import os
 import operator
 import argparse
 import requests
+import traceback
 import collections
 from datetime import datetime, timedelta
+
+from datadiff import diff
 
 from utils.csvblocks import csv_to_blocks
 from utils.json import serialize
 from utils.tree import (edges2simpletree, list_edges, list_leaves, list_all,
-                        get_list)
+                        get_list, get_ancestors)
 
 def get_changes_tree(changes):
     '''
@@ -137,13 +140,11 @@ def get_election_config(elections_path, election_id):
         election_config = json.loads(json.loads(f.read())["payload"]['configuration'])
         return election_config
 
-def get_changes_func(func_name):
+def get_changes_func(func_name, module_path='utils.changes'):
     '''
     gets a function by name from utils.changes module
     '''
-    module = __import__(
-        "utils.changes", globals(), locals(),
-        [func_name], 0)
+    module = __import__(module_path, globals(), locals(), [func_name], 0)
     return getattr(module, func_name)
 
 
@@ -154,15 +155,44 @@ def check_change_applied(func_name, kwargs, election_id, election_config):
     fargs = dict(election_config=election_config, election_id=election_id)
     if kwargs is not None:
         fargs.update(kwargs)
-    get_changes_func(func_name)(**fargs)
+    get_changes_func(func_name, 'utils.changes')(**fargs)
 
-# TODO
 def get_changes_chain_for_election_id(election_id, config, tree, node_changes):
-    return None
+    '''
+    Gets a complete list of changes to apply to an election
+    '''
+    changes_chain = []
+    # contains self
+    ancestors = get_ancestors(tree, election_id) + [election_id]
 
-# TODO
-def check_diff_changes(election_changes, election_id, tree):
-    pass
+    for ancestor_id in ancestors:
+        changes_chain = changes_chain + node_changes[ancestor_id]
+    return changes_chain, ancestors
+
+def apply_elections_changes(config, elections_path, ancestors, election_id,
+    election_changes):
+    '''
+    Apply changes to the given election
+    '''
+    election_config = get_election_config(elections_path, ancestors[0])
+    mod_path = 'utils.apply_election_changes'
+    for change in election_changes:
+        kwargs = dict(change=change, election_config=election_config)
+        try:
+            get_changes_func(change['action'], mod_path)(**kwargs)
+        except:
+            print("Error processing election(%s) change(%s):" % (
+                election_id, change['action']))
+            traceback.print_exc()
+    election_config['id'] = int(election_id)
+    return election_config
+
+def check_diff_changes(elections_path, election_id, calculated_election_config):
+    election_config = get_election_config(elections_path, election_id)
+    if serialize(election_config) != serialize(calculated_election_config):
+        print("calculated election config differs for election %s. showing diff(config, calculated)" % election_id)
+        print(diff(election_config, calculated_election_config))
+
 
 def check_changes(config, changes_path, elections_path, ids_path):
     '''
@@ -198,10 +228,13 @@ def check_changes(config, changes_path, elections_path, ids_path):
             check_change_applied(change, kwargs, election_id, election_config)
 
     # check the remaining changes
-    #for election_id in election_ids:
-        #election_changes = get_changes_chain_for_election_id(
-            #election_id, config, tree, node_changes)
-        #check_diff_changes(election_changes, election_id, tree)
+    for election_id in election_ids:
+        election_changes, ancestors = get_changes_chain_for_election_id(
+            election_id, config, tree, node_changes)
+
+        calculated_election = apply_elections_changes(
+            config, elections_path, ancestors, election_id, election_changes)
+        check_diff_changes(elections_path, election_id, calculated_election)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Helps doing configuration updates.')

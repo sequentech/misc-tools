@@ -1,4 +1,5 @@
 SQLAlchemy==0.9.7
 argparse==1.2.1
+datadiff==1.1.6
 prettytable==0.7.2
 requests==2.3.0
