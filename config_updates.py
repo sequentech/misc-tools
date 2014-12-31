@@ -80,12 +80,7 @@ def list_ids(config, changes_path, action, ids_path=None):
     tree = get_changes_tree(changes)
     l = []
 
-    if action == 'tree':
-        print(serialize(tree))
-        return
-    elif action == 'leaves_ancestors':
-        list_leaves(tree, l)
-
+    def add_others(l, ids_path):
         other_ids = []
         with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
             for line in f:
@@ -94,6 +89,14 @@ def list_ids(config, changes_path, action, ids_path=None):
 
         l = list(set(other_ids + l))
         l.sort()
+        return l
+
+    if action == 'tree':
+        print(serialize(tree))
+        return
+    elif action == 'leaves_ancestors':
+        list_leaves(tree, l)
+        l = add_others(l, ids_path)
         ancestors = dict()
         for election_id in l:
             ancestors[election_id] = get_ancestors(tree, election_id) + [election_id]
@@ -101,11 +104,14 @@ def list_ids(config, changes_path, action, ids_path=None):
             print(",".join(ancestors[election_id]))
         return
 
-    if action == "edges":
+    if action == 'edges':
         list_edges(tree, l)
-    if action == "leaves":
+    elif action == 'leaves':
         list_leaves(tree, l)
-    else:
+    elif action == 'all_with_others':
+        list_all(tree, l)
+        l = add_others(l, ids_path)
+    elif action == 'all':
         list_all(tree, l)
 
     l.sort()
@@ -223,6 +229,7 @@ def check_changes(config, changes_path, elections_path, ids_path):
     tree = get_changes_tree(changes)
     node_changes = get_node_changes(tree, changes)
     election_ids = get_list(tree, list_all)
+    parse_parity_config(config)
 
     # get all the ids
     other_ids = []
@@ -255,6 +262,24 @@ def check_changes(config, changes_path, elections_path, ids_path):
         calculated_election = apply_elections_changes(
             config, elections_path, ancestors, election_id, election_changes)
         check_diff_changes(elections_path, election_id, calculated_election)
+
+        # check that all final elections have been tagged with the sex
+        if "agora_results_config_parity" in config:
+            cfg = config["agora_results_config_parity"]
+            names = dict([
+                (i['answer_text'], i['is_woman'])
+                for i in cfg['parity_list']
+                if int(i['election_id']) == int(election_id)])
+
+            if len(names) == 0:
+                print("election %d not in the parity list")
+                continue
+
+            for question in calculated_election['questions']:
+                for answer in question['answers']:
+                    if answer['text'] not in names:
+                        print("Answer '%s' from election '%d' not in parity list" % (
+                            answer['text'], int(election_id)))
 
 def apply_results_config_prechanges(func_name, kwargs, ancestors, election_id,
     election_config, results_config):
@@ -349,29 +374,47 @@ def post_process_results_config(
         ])
 
     # check if multipart tallying needs to happen
-    if len(ancestors) == 1:
-        return
+    if len(ancestors) > 1:
+        # the first element of the agora_results config (before the do_tallies)
+        # should be a make_multipart with the list of ancestors
+        results_config.insert(0, [
+            "agora_results.pipes.multipart.make_multipart",
+            {"election_ids": [int(ancestor) for ancestor in ancestors]}
+        ])
 
-    # the first element of the agora_results config (before the do_tallies)
-    # should be a make_multipart with the list of ancestors
-    results_config.insert(0, [
-        "agora_results.pipes.multipart.make_multipart",
-        {"election_ids": [int(ancestor) for ancestor in ancestors]}
-    ])
+        # fill the question mappings
+        mappings = []
+        for question, dest_question_num in zip(questions, range(len(questions))):
+          for answer in question['answers']:
+            answer_mappings = find_answer_mappings(
+                hashed_election_configs, ancestors[:-1], answer, dest_question_num)
+            if len(answer_mappings) > 0:
+                mappings = mappings + answer_mappings
 
-    # fill the question mappings
-    mappings = []
-    for question, dest_question_num in zip(questions, range(len(questions))):
-      for answer in question['answers']:
-        answer_mappings = find_answer_mappings(
-            hashed_election_configs, ancestors[:-1], answer, dest_question_num)
-        if len(answer_mappings) > 0:
-            mappings = mappings + answer_mappings
+        results_config.append([
+            "agora_results.pipes.multipart.reduce_answer_with_corrections",
+            {"mappings": mappings}
+        ])
 
-    results_config.append([
-        "agora_results.pipes.multipart.reduce_with_corrections",
-        {"mappings": mappings}
-    ])
+    # add sorting if needed
+    if "agora_results_config_sorting" in config:
+        results_config.append(config["agora_results_config_sorting"])
+
+    # add parity at the end
+    if "agora_results_config_parity" in config:
+        if config["agora_results_config_parity"]["method"] == "proportion_rounded":
+            cfg = config["agora_results_config_parity"]
+            results_config.append([
+                "agora_results.pipes.parity.proportion_rounded",
+                {
+                    "women_names":[
+                        i['answer_text']
+                        for i in cfg['parity_list']
+                        if i['is_woman'] and int(i['election_id']) == int(election_id)],
+                    "proportions": cfg["proportions"]
+                }
+            ])
+
 
 def apply_changes_hashing(
     election_id,
@@ -402,6 +445,24 @@ def apply_changes_hashing(
     election_config['id'] = int(election_id)
     return election_config
 
+def parse_parity_config(config):
+    '''
+    parses parity config
+    '''
+    if "agora_results_config_parity" in config:
+        parity_list = []
+        path = config["agora_results_config_parity"]['sexes_tsv']
+        with open(path, mode='r', encoding="utf-8", errors='strict') as f:
+            for line in f:
+                line = line.strip()
+                election_id, sex, answer_text = line.split("\t")
+                parity_list.append(dict(
+                    election_id=int(election_id.strip()),
+                    is_woman=sex.strip() == 'M',
+                    answer_text=answer_text
+                ))
+            config["agora_results_config_parity"]['parity_list'] = parity_list
+
 
 def write_agora_results_files(config, changes_path, elections_path, ids_path):
     '''
@@ -413,6 +474,7 @@ def write_agora_results_files(config, changes_path, elections_path, ids_path):
     node_changes = get_node_changes(tree, changes)
     election_ids = get_list(tree, list_all)
     final_ids = get_list(tree, list_leaves)
+    parse_parity_config(config)
 
     # get all the ids
     other_ids = []
@@ -516,6 +578,7 @@ if __name__ == '__main__':
             'print_leaves_ids',
             'print_leaves_ancestors_ids',
             'print_all_ids',
+            'print_all_with_others_ids',
             'download_elections',
             'check_changes',
             'print_agora_elections_commands',
@@ -565,6 +628,9 @@ if __name__ == '__main__':
         list_ids(config, args.changes_path, action="leaves_ancestors", ids_path=args.ids_path)
     if args.action == 'print_all_ids':
         list_ids(config, args.changes_path, action="all")
+    if args.action == 'print_all_with_others_ids':
+        list_ids(config, args.changes_path, action="all_with_others", ids_path=args.ids_path)
+
     if args.action == 'download_elections':
         elections_path_check(os.W_OK)
         download_elections(config, args.changes_path, args.elections_path, args.ids_path)
