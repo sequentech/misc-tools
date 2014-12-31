@@ -19,6 +19,7 @@
 
 import json
 import os
+import copy
 import operator
 import argparse
 import requests
@@ -32,6 +33,7 @@ from utils.csvblocks import csv_to_blocks
 from utils.json import serialize
 from utils.tree import (edges2simpletree, list_edges, list_leaves, list_all,
                         get_list, get_ancestors)
+from utils.hashed_changes import hash_question
 
 def get_changes_tree(changes):
     '''
@@ -140,7 +142,7 @@ def get_election_config(elections_path, election_id):
         election_config = json.loads(json.loads(f.read())["payload"]['configuration'])
         return election_config
 
-def get_changes_func(func_name, module_path='utils.changes'):
+def get_changes_func(func_name, module_path):
     '''
     gets a function by name from utils.changes module
     '''
@@ -155,7 +157,7 @@ def check_change_applied(func_name, kwargs, election_id, election_config):
     fargs = dict(election_config=election_config, election_id=election_id)
     if kwargs is not None:
         fargs.update(kwargs)
-    get_changes_func(func_name, 'utils.changes')(**fargs)
+    get_changes_func(func_name, 'utils.prechanges_check')(**fargs)
 
 def get_changes_chain_for_election_id(election_id, config, tree, node_changes):
     '''
@@ -235,6 +237,225 @@ def check_changes(config, changes_path, elections_path, ids_path):
         calculated_election = apply_elections_changes(
             config, elections_path, ancestors, election_id, election_changes)
         check_diff_changes(elections_path, election_id, calculated_election)
+
+def apply_results_config_prechanges(func_name, kwargs, ancestors, election_id,
+    election_config, results_config):
+    '''
+    Get the prechanges and apply them in results_config
+    '''
+    fargs = dict(
+        election_config=election_config,
+        election_id=election_id,
+        ancestors=ancestors,
+        results_config=results_config)
+    if kwargs is not None:
+        fargs.update(kwargs)
+    get_changes_func(func_name, 'utils.prechanges_results')(**fargs)
+
+def find_answer_mappings(hashed_election_configs, ancestors, dest_answer, dest_question_num):
+    '''
+    Given an answer hash, the ancestors and the configs of the ancestors,
+    returns a list of found mappings, meaning, a list of places of locations
+    where the same answer hash has been found in the ancestors.
+
+    Example return value:
+    [
+      {
+        "source_election_id": 0,
+        "source_question_num": 0,
+        "source_answer_id": 1
+        "dest_question_num": 0,
+        "dest_answer_id": 1
+      },
+      ...
+    ]
+    '''
+    answer_mappings = []
+    for ancestor in ancestors:
+        election_config = hashed_election_configs[ancestor]['config']
+        questions = election_config['questions']
+        for question, question_num in zip(questions, range(len(questions))):
+            for answer in question['answers']:
+                if answer['hash'] == dest_answer['hash']:
+                    answer_mappings.append({
+                        "source_election_id": int(ancestor),
+                        "source_question_num": question_num,
+                        "source_answer_id": answer['id'],
+                        "dest_question_num": dest_question_num,
+                        "dest_answer_id": dest_answer['id']
+                    })
+    return answer_mappings
+
+
+def post_process_results_config(
+    config,
+    elections_path,
+    ancestors,
+    election_id,
+    results_config,
+    election_config,
+    hashed_election_configs):
+    '''
+    Adds the election-specific results configuration to results_config
+    '''
+    # first check for size corrections
+
+    # check for size corrections. the format of election_size_corrections is
+    # the accepted by the multipart.election_size_corrections function in
+    # agora-results: keys are the question ids, and the values are dictionaries
+    # with the election id as a key and [min, max] as values. Example
+    #
+    # {
+    #   "0": {
+    #     "233": [1, 3],
+    #     "233": [0, 4]
+    #   }
+    # }
+    election_size_corrections = dict()
+    questions = election_config['questions']
+    for question, i in zip(questions, range(len(questions))):
+        if 'modified_sizes' in question:
+            election_size_corrections[i] = question['modified_sizes']
+
+    if len(election_size_corrections) > 0:
+        results_config.append([
+            "agora_results.pipes.multipart.election_size_corrections",
+            {"corrections": election_size_corrections}
+        ])
+
+    # check if multipart tallying needs to happen
+    if len(ancestors) == 1:
+        return
+
+    # the first element of the agora_results config (before the do_tallies)
+    # should be a make_multipart with the list of ancestors
+    results_config.insert(0, [
+        "agora_results.pipes.multipart.make_multipart",
+        {"election_ids": ancestors}
+    ])
+
+    # fill the question mappings
+    mappings = []
+    for question, dest_question_num in zip(questions, range(len(questions))):
+      for answer in question['answers']:
+        answer_mappings = find_answer_mappings(
+            hashed_election_configs, ancestors[:-1], answer, dest_question_num)
+        if len(answer_mappings) > 0:
+            mappings = mappings + answer_mappings
+
+    results_config.append([
+        "agora_results.pipes.multipart.reduce_with_corrections",
+        {"mappings": mappings}
+    ])
+
+def apply_changes_hashing(
+    election_id,
+    election_config,
+    election_changes,
+    ancestors,
+    elections_path):
+    '''
+    Applies the changes in the elections hashing the questions and answers in
+    a reproducible them, to be able to later on backtrack the original answers
+    and questions
+    '''
+
+    # first of all, hash all the questions and answers in a reproducible way
+    questions = election_config['questions']
+    for question, i in zip(questions, range(len(questions))):
+        hash_question(question, ancestors[0], i)
+
+    mod_path = 'utils.hashed_changes'
+    for change in election_changes:
+        kwargs = dict(change=change, election_config=election_config)
+        try:
+            get_changes_func(change['action'], mod_path)(**kwargs)
+        except:
+            print("Error processing election(%s) change(%s):" % (
+                election_id, change['action']))
+            traceback.print_exc()
+    election_config['id'] = int(election_id)
+    return election_config
+
+
+def write_agora_results_files(config, changes_path, elections_path, ids_path):
+    '''
+    Checks that the configuration set
+    '''
+    # get changes and tree data
+    changes = get_changes_config(changes_path)
+    tree = get_changes_tree(changes)
+    node_changes = get_node_changes(tree, changes)
+    election_ids = get_list(tree, list_all)
+    final_ids = get_list(tree, list_leaves)
+
+    # get all the ids
+    other_ids = []
+    if ids_path is not None:
+        with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
+            for line in f:
+                line = line.strip()
+                other_ids.append(line)
+            # add to the tree the id as a root leave if not present
+            if line not in election_ids:
+                tree[line] = dict()
+    else:
+        print("WARNING: ids_path not supplied")
+
+    # join both list of ids, removing duplicates, and sorting the list
+    final_ids = list(set(final_ids + other_ids))
+    final_ids.sort()
+
+    election_ids = list(set(election_ids + other_ids))
+    election_ids.sort()
+
+    # calculate a configuration for each election, including middle steps, so
+    # that later on the answers between election can be tracked and collected
+    # by hash
+    hashed_election_configs = dict()
+    for election_id in election_ids:
+        election_changes, ancestors = get_changes_chain_for_election_id(
+            election_id, config, tree, node_changes)
+        election_config = get_election_config(elections_path, ancestors[0])
+        apply_changes_hashing(
+          election_id,
+          election_config,
+          election_changes,
+          ancestors,
+          elections_path)
+        hashed_election_configs[election_id] = dict(
+            config=election_config,
+            ancestors=ancestors
+        )
+
+    # iterate and process the results config for all final elections
+    for election_id in final_ids:
+        election_config = hashed_election_configs[election_id]['config']
+        ancestors = hashed_election_configs[election_id]['ancestors']
+        results_config = copy.deepcopy(config['agora_results_config'])
+
+        # apply first global_prechanges
+        for change, kwargs in config['global_prechanges']:
+            apply_results_config_prechanges(
+                change,
+                kwargs,
+                ancestors,
+                election_id,
+                election_config,
+                results_config)
+
+        post_process_results_config(
+            config,
+            elections_path,
+            ancestors,
+            election_id,
+            results_config,
+            election_config,
+            hashed_election_configs)
+
+        epath = os.path.join(elections_path, "%s.config.results.json" % election_id)
+        with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
+            f.write(serialize(results_config))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Helps doing configuration updates.')
@@ -326,3 +547,4 @@ if __name__ == '__main__':
         pass
     elif args.action == 'write_agora_results_files':
         elections_path_check(os.W_OK)
+        write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
