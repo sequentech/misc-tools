@@ -71,19 +71,36 @@ def get_node_changes(tree, changes):
         node_changes[key].append(change)
     return node_changes
 
-def list_ids(config, changes_path, action):
+def list_ids(config, changes_path, action, ids_path=None):
     '''
     Executes print actions related to the listing of election ids from the
     changes file. Available actions are 'tree', 'edges', 'leaves' and 'all'.
     '''
     changes = get_changes_config(changes_path)
     tree = get_changes_tree(changes)
+    l = []
 
     if action == 'tree':
-      print(serialize(tree))
-      return
+        print(serialize(tree))
+        return
+    elif action == 'leaves_ancestors':
+        list_leaves(tree, l)
 
-    l = []
+        other_ids = []
+        with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
+            for line in f:
+                line = line.strip()
+                other_ids.append(line)
+
+        l = other_ids + l
+        l.sort()
+        ancestors = dict()
+        for election_id in l:
+            ancestors[election_id] = get_ancestors(tree, election_id) + [election_id]
+        for election_id in l:
+            print(",".join(ancestors[election_id]))
+        return
+
     if action == "edges":
         list_edges(tree, l)
     if action == "leaves":
@@ -496,6 +513,7 @@ if __name__ == '__main__':
             'print_tree_ids',
             'print_edges_ids',
             'print_leaves_ids',
+            'print_leaves_ancestors_ids',
             'print_all_ids',
             'download_elections',
             'check_changes',
@@ -542,6 +560,8 @@ if __name__ == '__main__':
         list_ids(config, args.changes_path, action="edges")
     if args.action == 'print_leaves_ids':
         list_ids(config, args.changes_path, action="leaves")
+    if args.action == 'print_leaves_ancestors_ids':
+        list_ids(config, args.changes_path, action="leaves_ancestors", ids_path=args.ids_path)
     if args.action == 'print_all_ids':
         list_ids(config, args.changes_path, action="all")
     if args.action == 'download_elections':
