@@ -92,7 +92,7 @@ def list_ids(config, changes_path, action, ids_path=None):
                 line = line.strip()
                 other_ids.append(line)
 
-        l = other_ids + l
+        l = list(set(other_ids + l))
         l.sort()
         ancestors = dict()
         for election_id in l:
@@ -211,6 +211,7 @@ def check_diff_changes(elections_path, election_id, calculated_election_config):
     if serialize(election_config) != serialize(calculated_election_config):
         print("calculated election config differs for election %s. showing diff(config, calculated)" % election_id)
         print(diff(election_config, calculated_election_config))
+        print(serialize(calculated_election_config))
 
 
 def check_changes(config, changes_path, elections_path, ids_path):
@@ -355,7 +356,7 @@ def post_process_results_config(
     # should be a make_multipart with the list of ancestors
     results_config.insert(0, [
         "agora_results.pipes.multipart.make_multipart",
-        {"election_ids": ancestors}
+        {"election_ids": [int(ancestor) for ancestor in ancestors]}
     ])
 
     # fill the question mappings

@@ -148,7 +148,8 @@ def add_question(change, election_config, **kwargs):
     '''
 
     election_id = int(change['election_id'].strip())
-    election_config['questions'].append({
+    pos = int(change['question_number'].strip())
+    election_config['questions'].insert(pos, {
         "answer_total_votes_percentage": change['new_question_answer_total_votes_percentage'].strip(),
         "answers": [],
         "description": change['new_question_description'].strip(),
@@ -196,5 +197,11 @@ def new_election(change, election_config, **kwargs):
     '''
     we need to do nothing, it's a no-op change in this case as it's a shinny new
     election
+    '''
+    pass
+
+def noop(change, election_config, **kwargs):
+    '''
+    noop, used to add a link between two elections without any change
     '''
     pass
