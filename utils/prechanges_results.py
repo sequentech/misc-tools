@@ -33,6 +33,7 @@ def map_question_maximums_and_winners(election_config, election_id, ancestors,
 
         if 'modified_sizes' not in question:
             question['modified_sizes'] = dict()
+            election_config['max_winners_mapping'] = mapping
 
         modified_sizes = question['modified_sizes']
         max_size = max(question['max'], reverse_mapping_dict[question['max']])

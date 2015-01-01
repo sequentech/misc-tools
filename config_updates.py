@@ -24,6 +24,7 @@ import operator
 import argparse
 import requests
 import traceback
+import subprocess
 import collections
 from datetime import datetime, timedelta
 
@@ -348,29 +349,13 @@ def post_process_results_config(
     '''
     Adds the election-specific results configuration to results_config
     '''
-    # first check for size corrections
-
-    # check for size corrections. the format of election_size_corrections is
-    # the accepted by the multipart.election_size_corrections function in
-    # agora-results: keys are the question ids, and the values are dictionaries
-    # with the election id as a key and [min, max] as values. Example
-    #
-    # {
-    #   "0": {
-    #     "233": [1, 3],
-    #     "233": [0, 4]
-    #   }
-    # }
-    election_size_corrections = dict()
     questions = election_config['questions']
-    for question, i in zip(questions, range(len(questions))):
-        if 'modified_sizes' in question:
-            election_size_corrections[i] = question['modified_sizes']
 
-    if len(election_size_corrections) > 0:
-        results_config.append([
-            "agora_results.pipes.multipart.election_size_corrections",
-            {"corrections": election_size_corrections}
+    # first check for size corrections
+    if 'max_winners_mapping' in election_config:
+        results_config.insert(0, [
+            "agora_results.pipes.multipart.election_max_size_corrections",
+            {"corrections": election_config['max_winners_mapping']}
         ])
 
     # check if multipart tallying needs to happen
@@ -398,7 +383,7 @@ def post_process_results_config(
 
     # add sorting if needed
     if "agora_results_config_sorting" in config:
-        results_config.append(config["agora_results_config_sorting"])
+        results_config[:] = results_config + config["agora_results_config_sorting"]
 
     # add parity at the end
     if "agora_results_config_parity" in config:
@@ -544,6 +529,90 @@ def write_agora_results_files(config, changes_path, elections_path, ids_path):
         with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
             f.write(serialize(results_config))
 
+def calculate_results(config, tree_path, elections_path):
+    '''
+    Launches agora-results for those elections that do have a tally
+    '''
+    cfg_res_postfix = '.config.results.json'
+    ids_w_res_config = [
+        int(f.replace(cfg_res_postfix, ''))
+        for f in os.listdir(elections_path)
+        if os.path.isfile(os.path.join(elections_path, f)) and f.endswith(cfg_res_postfix)]
+
+    with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
+        tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
+
+    priv_path = config["agora_elections_private_datastore_path"]
+    for eids in tree:
+        # check for config file
+        last_id = eids[-1]
+        if last_id not in ids_w_res_config:
+            print("eids = %s, no res config for %d, passing" % (json.dumps(eids), last_id))
+            continue
+
+        # check for tallies
+        tallies = []
+        for eid in eids:
+            tally_path = os.path.join(priv_path, str(eid), 'tally.tar.gz')
+            ids_path = os.path.join(priv_path, str(eid), 'ids')
+            if not os.path.isfile(ids_path):
+                print("eids = %s, eid %d has not even ids, passing" % (json.dumps(eids), eid))
+            if not os.path.isfile(tally_path):
+                print("eids = %s, eid %d has no tally (yet?), passing" % (json.dumps(eids), eid))
+                break
+            tallies.append(tally_path)
+        if len(tallies) != len(eids):
+            continue
+
+        print("eids = %s: calculating results.. " % json.dumps(eids), end="")
+
+        # got the tallies, the config file --> calculate results
+        def create_results(last_id, cfg_res_postfix, elections_path, bin_path, oformat):
+            cmd = "%s -t %s -c %s -s -o %s" % (
+              bin_path,
+              " ".join(tallies),
+              os.path.join(elections_path, str(last_id) + cfg_res_postfix),
+              oformat)
+            print(oformat, end=' ')
+            f_path = os.path.join(elections_path, str(last_id) + ".results." + oformat)
+            with open(f_path, mode='w', encoding="utf-8", errors='strict') as f:
+                subprocess.check_call(cmd, stdout=f, stderr=subprocess.STDOUT, shell=True)
+
+        bin_path = config['agora_results_bin_path']
+        create_results(last_id, cfg_res_postfix, elections_path, bin_path, "json")
+        create_results(last_id, cfg_res_postfix, elections_path, bin_path, "tsv")
+        create_results(last_id, cfg_res_postfix, elections_path, bin_path, "pretty")
+        print()
+
+def count_votes(config, tree_path):
+    '''
+    Counts votes per election id and in total
+    '''
+    priv_path = config["agora_elections_private_datastore_path"]
+
+    with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
+        tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
+
+    total_votes = 0
+    for eids in tree:
+        last_id = eids[-1]
+
+        # check for ids
+        n_votes = []
+        for eid in eids:
+            ids_path = os.path.join(priv_path, str(eid), 'ids')
+            if not os.path.isfile(ids_path):
+                print("eids = %s, eid %d has not even ids, passing" % (json.dumps(eids), eid))
+                n_votes.append(None)
+                continue
+            n_votes2 = 0
+            with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
+                n_votes2 = len(json.loads(f.read()))
+            n_votes.append(n_votes2)
+            total_votes += n_votes2
+        print("%s = %s" % (json.dumps(eids), json.dumps(n_votes)))
+    print("total votes: %d" % total_votes)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Helps doing configuration updates.')
     parser.add_argument(
@@ -561,6 +630,11 @@ if __name__ == '__main__':
         '-e',
         '--elections-path',
         help='directory where the elections configuration should be')
+
+    parser.add_argument(
+        '-t',
+        '--tree-path',
+        help='file generated with print_leaves_ancestors_ids')
 
     parser.add_argument(
         '-i',
@@ -581,8 +655,9 @@ if __name__ == '__main__':
             'print_all_with_others_ids',
             'download_elections',
             'check_changes',
-            'print_agora_elections_commands',
-            'write_agora_results_files'],
+            'write_agora_results_files',
+            'calculate_results',
+            'count_votes'],
         required=True)
 
     args = parser.parse_args()
@@ -620,25 +695,26 @@ if __name__ == '__main__':
 
     if args.action == 'print_tree_ids':
         list_ids(config, args.changes_path, action="tree")
-    if args.action == 'print_edges_ids':
+    elif args.action == 'print_edges_ids':
         list_ids(config, args.changes_path, action="edges")
-    if args.action == 'print_leaves_ids':
+    elif args.action == 'print_leaves_ids':
         list_ids(config, args.changes_path, action="leaves")
-    if args.action == 'print_leaves_ancestors_ids':
+    elif args.action == 'print_leaves_ancestors_ids':
         list_ids(config, args.changes_path, action="leaves_ancestors", ids_path=args.ids_path)
-    if args.action == 'print_all_ids':
+    elif args.action == 'print_all_ids':
         list_ids(config, args.changes_path, action="all")
-    if args.action == 'print_all_with_others_ids':
+    elif args.action == 'print_all_with_others_ids':
         list_ids(config, args.changes_path, action="all_with_others", ids_path=args.ids_path)
-
-    if args.action == 'download_elections':
+    elif args.action == 'download_elections':
         elections_path_check(os.W_OK)
         download_elections(config, args.changes_path, args.elections_path, args.ids_path)
-    if args.action == 'check_changes':
+    elif args.action == 'check_changes':
         elections_path_check(os.R_OK)
         check_changes(config, args.changes_path, args.elections_path, args.ids_path)
-    elif args.action == 'print_agora_elections_commands':
-        pass
+    elif args.action == 'calculate_results':
+        calculate_results(config, args.tree_path, args.elections_path)
+    elif args.action == 'count_votes':
+        count_votes(config, args.tree_path)
     elif args.action == 'write_agora_results_files':
         elections_path_check(os.W_OK)
         write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
