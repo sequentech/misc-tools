@@ -19,6 +19,7 @@
 
 import json
 import os
+import sys
 import copy
 import operator
 import argparse
@@ -35,6 +36,7 @@ from utils.json import serialize
 from utils.tree import (edges2simpletree, list_edges, list_leaves, list_all,
                         get_list, get_ancestors)
 from utils.hashed_changes import hash_question
+from utils.deterministic_tar import deterministic_tar_open, deterministic_tar_add
 
 def get_changes_tree(changes):
     '''
@@ -296,6 +298,44 @@ def apply_results_config_prechanges(func_name, kwargs, ancestors, election_id,
         fargs.update(kwargs)
     get_changes_func(func_name, 'utils.prechanges_results')(**fargs)
 
+
+def find_question_mappings(hashed_election_configs, ancestors, dest_question, dest_question_num):
+    '''
+    Given a hashed question, the ancestors and the configs of the ancestors,
+    returns a list of found mappings, meaning, a list of places of locations
+    where the same question hash has been found in the ancestors.
+
+    Example return value:
+    [
+    {
+      'source_election_id': 0,
+      'source_question_num': 0,
+      'source_question_title': "what?",
+      'dest_question_num': 0,
+      'dest_question_title': "what?",
+    },
+    ...
+   ]
+    '''
+    q_mappings = []
+    for ancestor in ancestors:
+        election_config = hashed_election_configs[ancestor]['config']
+        questions = election_config['questions']
+        for question, question_num in zip(questions, range(len(questions))):
+            if question['hash'] == dest_question['hash']:
+                if question['title'] != dest_question['title']:
+                    print("WARNING: question mapping for different titles: (source, dest) = ('%s', '%s')" % (
+                        question['title'], dest_question['title']))
+                q_mappings.append({
+                    'source_election_id': int(ancestor),
+                    'source_question_num': question_num,
+                    'source_question_title': question['title'],
+                    'dest_question_num': dest_question_num,
+                    'dest_question_title': dest_question['title'],
+                })
+    return q_mappings
+
+
 def find_answer_mappings(hashed_election_configs, ancestors, dest_answer, dest_question_num):
     '''
     Given an answer hash, the ancestors and the configs of the ancestors,
@@ -367,9 +407,13 @@ def post_process_results_config(
             {"election_ids": [int(ancestor) for ancestor in ancestors]}
         ])
 
-        # fill the question mappings
+        # fill the answers and questions mappings
         mappings = []
+        qmappings = []
         for question, dest_question_num in zip(questions, range(len(questions))):
+          qmappings = qmappings + find_question_mappings(
+                hashed_election_configs, ancestors[:-1], question, dest_question_num)
+
           for answer in question['answers']:
             answer_mappings = find_answer_mappings(
                 hashed_election_configs, ancestors[:-1], answer, dest_question_num)
@@ -377,7 +421,12 @@ def post_process_results_config(
                 mappings = mappings + answer_mappings
 
         results_config.append([
-            "agora_results.pipes.multipart.reduce_answer_with_corrections",
+            "agora_results.pipes.multipart.question_totals_with_corrections",
+            {"mappings": qmappings}
+        ])
+
+        results_config.append([
+            "agora_results.pipes.multipart.reduce_answers_with_corrections",
             {"mappings": mappings}
         ])
 
@@ -387,16 +436,20 @@ def post_process_results_config(
 
     # add parity at the end
     if "agora_results_config_parity" in config:
-        if config["agora_results_config_parity"]["method"] == "proportion_rounded":
+        if config["agora_results_config_parity"]["method"] == "podemos_proportion_rounded_and_duplicates":
             cfg = config["agora_results_config_parity"]
+            withdrawls = []
+            if "tie_withdrawals" in election_config:
+                withdrawls = election_config['tie_withdrawals'][str(election_id)]
             results_config.append([
-                "agora_results.pipes.parity.proportion_rounded",
+                "agora_results.pipes.podemos.podemos_proportion_rounded_and_duplicates",
                 {
                     "women_names":[
                         i['answer_text']
                         for i in cfg['parity_list']
                         if i['is_woman'] and int(i['election_id']) == int(election_id)],
-                    "proportions": cfg["proportions"]
+                    "proportions": cfg["proportions"],
+                    "withdrawed_candidates": withdrawls
                 }
             ])
 
@@ -529,7 +582,7 @@ def write_agora_results_files(config, changes_path, elections_path, ids_path):
         with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
             f.write(serialize(results_config))
 
-def calculate_results(config, tree_path, elections_path):
+def calculate_results(config, tree_path, elections_path, check):
     '''
     Launches agora-results for those elections that do have a tally
     '''
@@ -573,15 +626,18 @@ def calculate_results(config, tree_path, elections_path):
               " ".join(tallies),
               os.path.join(elections_path, str(last_id) + cfg_res_postfix),
               oformat)
+            if check:
+                cmd = cmd.replace("-s ", "")
             print(oformat, end=' ')
             f_path = os.path.join(elections_path, str(last_id) + ".results." + oformat)
             with open(f_path, mode='w', encoding="utf-8", errors='strict') as f:
-                subprocess.check_call(cmd, stdout=f, stderr=subprocess.STDOUT, shell=True)
+                subprocess.check_call(cmd, stdout=f, stderr=sys.stderr, shell=True)
 
         bin_path = config['agora_results_bin_path']
         create_results(last_id, cfg_res_postfix, elections_path, bin_path, "json")
-        create_results(last_id, cfg_res_postfix, elections_path, bin_path, "tsv")
-        create_results(last_id, cfg_res_postfix, elections_path, bin_path, "pretty")
+        if not check:
+            create_results(last_id, cfg_res_postfix, elections_path, bin_path, "tsv")
+            create_results(last_id, cfg_res_postfix, elections_path, bin_path, "pretty")
         print()
 
 def count_votes(config, tree_path):
@@ -613,6 +669,52 @@ def count_votes(config, tree_path):
         print("%s = %s" % (json.dumps(eids), json.dumps(n_votes)))
     print("total votes: %d" % total_votes)
 
+def tar_tallies(config, tree_path, elections_path, tallies_path):
+    '''
+    Tars the tallies conveniently
+    '''
+    priv_path = config["agora_elections_private_datastore_path"]
+
+    with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
+        tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
+
+    def can_read_file(f):
+      return os.access(f, os.R_OK) and os.path.isfile(f)
+
+    def check_files(paths, eids):
+        for path in paths:
+            if not can_read_file(path):
+                print("eids = %s, has no %s, passing" % (
+                    json.dumps(eids), path))
+                return False
+        return True
+
+
+    total_votes = 0
+    for eids in tree:
+        last_id = eids[-1]
+
+        # check all needed files are there
+        paths = [
+            os.path.join(elections_path, "%d.results.json" % last_id),
+            os.path.join(elections_path, "%d.config.results.json" % last_id)
+        ] + [
+            os.path.join(priv_path, str(eid), 'tally.tar.gz')
+            for eid in eids
+        ]
+        if not check_files(paths, eids):
+            continue
+
+        # create tar
+        tar_path = os.path.join(tallies_path, "%d.tar" % last_id)
+        print("creating %s .." % tar_path)
+        tar = deterministic_tar_open(tar_path, "w")
+
+        arc_names = ["results.json", "config.json"] + ["%d.tar.gz" % i for i in range(len(eids))]
+        for path, arc_name in zip(paths, arc_names):
+            deterministic_tar_add(tar, path, arc_name)
+        tar.close()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Helps doing configuration updates.')
     parser.add_argument(
@@ -643,6 +745,12 @@ if __name__ == '__main__':
         default=None)
 
     parser.add_argument(
+        '-T',
+        '--tallies-path',
+        help='path where to save the tallies',
+        default=None)
+
+    parser.add_argument(
         '-a',
         '--action',
         help='action to execute',
@@ -657,7 +765,9 @@ if __name__ == '__main__':
             'check_changes',
             'write_agora_results_files',
             'calculate_results',
-            'count_votes'],
+            'check_results',
+            'count_votes',
+            'tar_tallies'],
         required=True)
 
     args = parser.parse_args()
@@ -712,7 +822,11 @@ if __name__ == '__main__':
         elections_path_check(os.R_OK)
         check_changes(config, args.changes_path, args.elections_path, args.ids_path)
     elif args.action == 'calculate_results':
-        calculate_results(config, args.tree_path, args.elections_path)
+        calculate_results(config, args.tree_path, args.elections_path, check=False)
+    elif args.action == 'check_results':
+        calculate_results(config, args.tree_path, args.elections_path, check=True)
+    elif args.action == 'tar_tallies':
+        tar_tallies(config, args.tree_path, args.elections_path, args.tallies_path)
     elif args.action == 'count_votes':
         count_votes(config, args.tree_path)
     elif args.action == 'write_agora_results_files':

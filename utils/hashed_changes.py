@@ -17,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import hashlib
+import collections
 from base64 import urlsafe_b64encode
 
 from utils import apply_election_changes
@@ -274,3 +275,21 @@ def noop(change, election_config, **kwargs):
     noop, used to add a link between two elections without any change
     '''
     pass
+
+
+
+def tie_withdrawal(change, election_config, **kwargs):
+    '''
+    Used to withdraw a candidate in an election because a tie happened
+    '''
+    if 'tie_withdrawals' not in election_config:
+        election_config['tie_withdrawals'] = collections.defaultdict(list)
+
+    question_num = int(change['question_number'].strip())
+    candidature_id = int(change['candidature_id'].strip())
+    election_id = int(change['election_id'].strip())
+
+    election_config['tie_withdrawals'][str(election_id)].append({
+        "question_num": question_num,
+        "id": candidature_id
+    })
