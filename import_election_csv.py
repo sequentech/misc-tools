@@ -76,7 +76,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
         questions.append(data)
 
 
-    start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M")
+    start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M:%S")
     ret = config
     ret.update({
         "id": int(election['Id']) + add_to_id,
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     if not os.access(args.input_path, os.R_OK):
       print("can't read %s" % args.input_path)
       exit(2)
-    if not os.access(args.output_path, os.W_OK):
+    if os.path.isdir(args.output_path) and not os.access(args.output_path, os.W_OK):
       print("can't write to %s" % args.output_path)
       exit(2)
     if not os.access(args.config_path, os.R_OK):
