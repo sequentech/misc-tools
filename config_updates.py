@@ -620,21 +620,25 @@ def calculate_results(config, tree_path, elections_path, check):
         print("eids = %s: calculating results.. " % json.dumps(eids), end="")
 
         # got the tallies, the config file --> calculate results
-        def create_results(last_id, cfg_res_postfix, elections_path, bin_path, oformat):
+        def create_results(last_id, cfg_res_postfix, elections_path, bin_path, oformat, only_check=False):
             cmd = "%s -t %s -c %s -s -o %s" % (
-              bin_path,
-              " ".join(tallies),
-              os.path.join(elections_path, str(last_id) + cfg_res_postfix),
-              oformat)
-            if check:
+                bin_path,
+                " ".join(tallies),
+                os.path.join(elections_path, str(last_id) + cfg_res_postfix),
+                oformat)
+            if only_check:
+                print(cmd)
                 cmd = cmd.replace("-s ", "")
             print(oformat, end=' ')
+            if only_check:
+                subprocess.check_call(cmd, stderr=sys.stderr, shell=True)
+                return
             f_path = os.path.join(elections_path, str(last_id) + ".results." + oformat)
             with open(f_path, mode='w', encoding="utf-8", errors='strict') as f:
                 subprocess.check_call(cmd, stdout=f, stderr=sys.stderr, shell=True)
 
         bin_path = config['agora_results_bin_path']
-        create_results(last_id, cfg_res_postfix, elections_path, bin_path, "json")
+        create_results(last_id, cfg_res_postfix, elections_path, bin_path, "json", only_check=check)
         if not check:
             create_results(last_id, cfg_res_postfix, elections_path, bin_path, "tsv")
             create_results(last_id, cfg_res_postfix, elections_path, bin_path, "pretty")
