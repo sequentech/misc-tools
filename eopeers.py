@@ -95,7 +95,7 @@ def _validate_package(el_json):
                 print("Invalid data for key %s: %s" % (check['key'], str(data)[:100]))
                 exit(1)
 
-def install(PEER_LIST, path):
+def install(PEER_LIST, path, keystore=None):
     '''
     install the peer package by path
     '''
@@ -147,7 +147,18 @@ def install(PEER_LIST, path):
     with open(path, 'w') as f:
         f.write(json.dumps(el_json))
 
-def uninstall(PEER_LIST, hostname):
+    if keystore:
+        keystore = keystore[0]
+        # adding the key to the keystore
+        temppem = "/tmp/eopeers-auth.pem"
+        with open(temppem, "w") as f:
+            f.write(el_json["ssl_certificate"])
+            #keytool --delete mykey -keystore keystore.jks
+        subprocess.call("keytool -import -file %s -keystore %s" % (temppem,
+                        keystore), shell=True)
+        os.unlink(temppem)
+
+def uninstall(PEER_LIST, hostname, keystore=None):
     '''
     uninstall the peer package by hostname
     '''
@@ -190,6 +201,11 @@ def uninstall(PEER_LIST, hostname):
 
     # finally remove the package
     os.unlink(path)
+
+    if keystore:
+        keystore = keystore[0]
+        # removing the key from the keystore
+        subprocess.call("keytool -delete -alias mykey -keystore %s" % keystore, shell=True)
 
 def showmine(pargs):
     '''
@@ -262,6 +278,8 @@ def main():
                         'private ip instead of the public one', action="store_true")
     parser.add_argument('--show', help="show the content of an installed package "
                         "by hostname")
+    parser.add_argument('--keystore', nargs=1, help='The keystore path '
+                        'to add or remove with keytool')
 
     pargs = parser.parse_args()
 
@@ -275,10 +293,10 @@ def main():
             print(" * %s" % el['hostname'])
     elif pargs.install:
         for path in pargs.install:
-            install(PEER_LIST, path)
+            install(PEER_LIST, path, pargs.keystore)
     elif pargs.uninstall:
         for path in pargs.uninstall:
-            uninstall(PEER_LIST, path)
+            uninstall(PEER_LIST, path, pargs.keystore)
     elif pargs.show_mine:
         showmine(pargs)
     elif pargs.show:
