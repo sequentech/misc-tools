@@ -3,6 +3,10 @@
 import requests
 import json
 import time
+import random
+
+from functools import partial
+from base64 import urlsafe_b64encode
 
 import BaseHTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -192,9 +196,6 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
 # misc\utils.py
 BUF_SIZE = 10*1024
-from functools import partial
-from base64 import urlsafe_b64encode
-
 def hash_file(file_path):
     '''
     Returns the hexdigest of the hash of the contents of a file, given the file
@@ -206,6 +207,7 @@ def hash_file(file_path):
         hash.update(chunk)
     f.close()
     return urlsafe_b64encode(hash.digest())
+
 
 def writeVotes(votesData, fileName):
     # forms/election.py:save
@@ -245,8 +247,8 @@ def startServer(port):
     thread.start()
 
 def startElection(electionId, url, data):
-    data['id'] = electionId
-    print("> Creating election " + electionId)
+    data['id'] = int(electionId)
+    print("> Creating election %s" % electionId)
     cv.done = False
     r = requests.post(url, data=json.dumps(data), verify=False, cert=(CERT, KEY))
     print("> " + str(r))
@@ -274,7 +276,7 @@ def waitForPublicKey():
 def doTally(electionId, url, data, votesFile, hash):
     data['votes_url'] = data['votes_url'] + votesFile
     data['votes_hash'] = data['votes_hash'] + hash
-    data['election_id'] = electionId
+    data['election_id'] = int(electionId)
     # print("> Tally post with " + json.dumps(data))
     print("> Requesting tally..")
     cv.done = False
@@ -444,9 +446,9 @@ full: does the whole process''')
     command = args.command[0]
     if hasattr(__main__, command):
         if(command == 'create') or (command == 'full'):
-            args.electionId = int(time.time()).replace(".", "")
+            args.electionId = str(random.randint(100, 10000))
         elif(len(args.command) == 2):
-            args.electionId = int(args.command[1])
+            args.electionId = args.command[1]
         else:
             parser.print_help()
             exit(1)
