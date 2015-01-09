@@ -1,0 +1,8 @@
+{
+    "PEER_LIST": "/etc/eopeers",
+    "VERSION": 1,
+    "PUBLIC_IP_ADDRESS": "192.168.0.1",
+    "PRIVATE_IP_ADDRESS": "192.168.0.1",
+    "HOSTNAME": "election-orchestra",
+    "PORT": 5000
+}

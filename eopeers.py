@@ -6,12 +6,25 @@ import json
 import shutil
 import subprocess
 
-PEER_LIST = "/etc/eopeers"
-VERSION = 1
-PUBLIC_IP_ADDRESS = "{{ config.public_ipaddress }}"
-PRIVATE_IP_ADDRESS = "{{ config.private_ipaddress }}"
-HOSTNAME = "{{ config.host }}"
-PORT = {{ config.port }}
+try:
+    CONFIG = json.load(open('/etc/eoconf.json'))
+except:
+    print("/etc/eoconf.json not found, using default vars")
+    CONFIG = {
+        "PEER_LIST": "/etc/eopeers",
+        "VERSION": 1,
+        "PUBLIC_IP_ADDRESS": "192.168.0.1",
+        "PRIVATE_IP_ADDRESS": "192.168.0.1",
+        "HOSTNAME": "election-orchestra",
+        "PORT": 5000
+    }
+
+PEER_LIST = CONFIG['PEER_LIST']
+VERSION = CONFIG['VERSION']
+PUBLIC_IP_ADDRESS = CONFIG['PUBLIC_IP_ADDRESS']
+PRIVATE_IP_ADDRESS = CONFIG['PRIVATE_IP_ADDRESS']
+HOSTNAME = CONFIG['HOSTNAME']
+PORT = CONFIG['PORT']
 
 def _validate_package(el_json):
     '''
