@@ -135,8 +135,12 @@ def install(PEER_LIST, path):
         subprocess.call("echo '%s' >> /srv/certs/selfsigned/calist" %
             el_json["ssl_certificate"], shell=True)
 
-    # TODO: this line is comment for election-orchestra
-    shutil.copyfile("/srv/certs/selfsigned/calist", "/home/eorchestra/election-orchestra/certs/selfsigned/calist")
+    try:
+        shutil.copyfile("/srv/certs/selfsigned/calist", "/home/eorchestra/election-orchestra/certs/selfsigned/calist")
+    except:
+        # It's not critical if the eorchestra is not installed. This is
+        # optional
+        pass
 
     # save peer package
     path = os.path.join(PEER_LIST, el_json['hostname'] + ".package")
@@ -177,7 +181,12 @@ def uninstall(PEER_LIST, hostname):
     with open('/srv/certs/selfsigned/calist', 'w') as f:
         f.write(data)
 
-    shutil.copyfile("/srv/certs/selfsigned/calist", "/home/eorchestra/election-orchestra/certs/selfsigned/calist")
+    try:
+        shutil.copyfile("/srv/certs/selfsigned/calist", "/home/eorchestra/election-orchestra/certs/selfsigned/calist")
+    except:
+        # It's not critical if the eorchestra is not installed. This is
+        # optional
+        pass
 
     # finally remove the package
     os.unlink(path)
