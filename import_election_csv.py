@@ -18,13 +18,53 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
+import csv
 import os
+import copy
 import operator
 import argparse
 from datetime import datetime, timedelta
 
 from utils.csvblocks import csv_to_blocks
 from utils.json import serialize
+
+BASE_ELECTION = {
+    "id": -1,
+    "title": "",
+    "description": "",
+    "layout": "",
+    "presentation": {
+        "share_text": "",
+        "theme": 'default',
+        "urls": [],
+        "theme_css": ""
+    },
+    "end_date": "",
+    "start_date": "",
+    "questions": []
+}
+
+BASE_QUESTION = {
+    "description": "",
+    "layout": 'simple',
+    "max": 1,
+    "min": 0,
+    "num_winners": 1,
+    "title": "",
+    "randomize_answer_order": True,
+    "tally_type": "plurality-at-large",
+    "answer_total_votes_percentage": "over-total-votes",
+    "answers": []
+}
+
+BASE_ANSWER = {
+    "id": -1,
+    "category": '',
+    "details": "",
+    "sort_order": -1,
+    "urls": [],
+    "text": ""
+}
 
 def blocks_to_election(blocks, config, add_to_id=0):
     '''
@@ -41,18 +81,18 @@ def blocks_to_election(blocks, config, add_to_id=0):
 
         data = {
             "description": q["Description"],
-            "layout": q["Layout"],
+            "layout": q.get("Layout", 'simple'),
             "max": int(q["Maximum choices"]),
             "min": int(q["Minimum choices"]),
             "num_winners": int(q["Number of winners"]),
             "title": q["Title"],
             "randomize_answer_order": q["Randomize options order"] == "TRUE",
-            "tally_type": q["Voting system"],
+            "tally_type": q.get("Voting system", "plurality-at-large"),
             "answer_total_votes_percentage": q["Totals"],
             "answers": [
               {
                   "id": int(answer["Id"]),
-                  "category": answer["Category"],
+                  "category": answer.get("Category", ''),
                   "details": "",
                   "sort_order": index,
                   "urls": [],
@@ -82,10 +122,10 @@ def blocks_to_election(blocks, config, add_to_id=0):
         "id": int(election['Id']) + add_to_id,
         "title": election['Title'],
         "description": election['Description'],
-        "layout": election['Layout'],
+        "layout": election.get('Layout', ''),
         "presentation": {
-            "share_text": election['Share Text'],
-            "theme": election['Theme'],
+            "share_text": election.get('Share Text', ''),
+            "theme": election.get('Theme', 'default'),
             "urls": [],
             "theme_css": ""
         },
@@ -95,12 +135,88 @@ def blocks_to_election(blocks, config, add_to_id=0):
     })
     return ret
 
+def form_to_elections(path, separator, config, add_to_id):
+    '''
+    Converts the google forms into election configurations
+    '''
+    election_funcs = {
+        "Título": lambda d: ["title", d],
+        "Descripción": lambda d: ["descripcion", d],
+        "Comienzo": lambda d: ["start_date", datetime.strptime(d, "%m/%d/%Y %H:%M:%S").isoformat()+ ".001"],
+        "Final": lambda d: ["end_date", datetime.strptime(d, "%m/%d/%Y %H:%M:%S").isoformat()+ ".001"],
+    }
+    census_key = "Censo"
+    more_keys = {
+        "¿Más preguntas?": lambda v: "No" not in v
+    }
+    question_options_key = "Opciones"
+    question_funcs = {
+        "Título": lambda d: ["title", d],
+        "Descripción": lambda d: ["description", d],
+        "Número de ganadores": lambda d: ["num_winners", int(d)],
+        "Número máximo de opciones": lambda d: ["max", int(d)],
+        "Número mínimo de opciones": lambda d: ["min", int(d)],
+        "Orden aleatorio": lambda d: ["randomize_answer_order", d == "Aleatorio"],
+        "Resultados":  lambda d: ["answer_total_votes_percentage", "over-total-votes" if d == "Sobre votos totales" else "over-total-valid-votes"]
+    }
+
+    elections = []
+    with open(path, mode='r', encoding="utf-8", errors='strict') as f:
+        fcsv = csv.reader(f, delimiter=',', quotechar='"')
+        keys = fcsv.__next__()
+        for values in fcsv:
+            if len(values) == 0:
+                continue
+
+            question_num = -1
+            election = copy.deepcopy(BASE_ELECTION)
+            election['id'] = add_to_id + len(elections)
+            question = None
+
+            for key, value, index in zip(keys, values, range(len(values))):
+                if question_num == -1 and key not in more_keys.keys() and key in election_funcs.keys():
+                    dest_key, dest_value =  election_funcs[key](value)
+                    election[dest_key] = dest_value
+                elif key == census_key:
+                    election['census'] = value.split("\n")
+                    question_num += 1
+                    question = copy.deepcopy(BASE_QUESTION)
+                elif question_num >= 0 and key in question_funcs.keys():
+                    dest_key, dest_value =  question_funcs[key](value)
+                    question[dest_key] = dest_value
+                elif question_num >= 0 and key == question_options_key:
+                    options = value.strip().split("\n")
+                    question['answers'] = [{
+                        "id": opt_id,
+                        "category": '',
+                        "details": '',
+                        "sort_order": opt_id,
+                        "urls": [],
+                        "text": opt
+                    }
+                    for opt, opt_id in zip(options, range(len(options)))]
+                elif question_num >= 0 and key in more_keys.keys():
+                    question_num += 1
+                    election['questions'].append(question)
+                    question = copy.deepcopy(BASE_QUESTION)
+
+                    if not more_keys[key](value):
+                        elections.append(election)
+                        break
+    return elections
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Converts a CSV into the json to create an election.')
     parser.add_argument('-c', '--config-path', help='default config for the election')
     parser.add_argument('-i', '--input-path', help='input file or directory')
     parser.add_argument('-o', '--output-path', help='output file or directory')
     parser.add_argument('-a', '--add-to-id', type=int, help='add an int number to the id', default=0)
+    parser.add_argument(
+        '-f', '--format',
+        choices=['tsv-blocks', 'csv-google-forms'],
+        default="tsv-blocks",
+        help='output file or directory')
+
 
     args = parser.parse_args()
 
@@ -124,8 +240,8 @@ if __name__ == '__main__':
             if os.path.isdir(full_path):
                 continue
 
-            blocks = csv_to_blocks(path=full_path, separator="\t")
             try:
+                blocks = csv_to_blocks(path=full_path, separator="\t")
                 election = blocks_to_election(blocks, config, args.add_to_id)
                 fname = fname.replace(str(election["id"] - args.add_to_id), str(election["id"]))
             except:
@@ -149,19 +265,36 @@ if __name__ == '__main__':
                         errors='strict') as f:
                     f.write(serialize(config['agora_results_config']))
     else:
-        blocks = csv_to_blocks(path=args.input_path, separator="\t")
-
-        print(serialize(blocks))
 
         try:
-            election = blocks_to_election(blocks, config)
+            if args.format == "tsv-blocks":
+                blocks = csv_to_blocks(path=args.input_path, separator="\t")
+                election = blocks_to_election(blocks, config, args.add_to_id)
+
+                print(serialize(election))
+
+                with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
+                    f.write(serialize(election))
+            else:
+                if not os.path.isdir(args.output_path):
+                    print("output path must be a directory")
+                    exit(2)
+
+                elections = form_to_elections(path=args.input_path,
+                                              separator="\t",
+                                              config=config,
+                                              add_to_id=args.add_to_id)
+                for election in elections:
+                    fpath = os.path.join(args.output_path, "%d.census.json" % election["id"])
+                    with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
+                        f.write(serialize(election['census']))
+                    del election['census']
+
+                    fpath = os.path.join(args.output_path, "%d.json" % election["id"])
+                    with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
+                        f.write(serialize(election))
         except:
             print("malformed CSV")
             import traceback
             traceback.print_exc()
             exit(3)
-
-        print(serialize(election))
-
-        with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
-            f.write(serialize(election))
