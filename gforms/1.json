@@ -1,0 +1,54 @@
+{
+    "descripcion": "Lorem ipsum",
+    "description": "",
+    "end_date": "2015-01-21T23:59:00.001",
+    "id": 1,
+    "layout": "",
+    "presentation": {
+        "share_text": "",
+        "theme": "default",
+        "theme_css": "",
+        "urls": []
+    },
+    "questions": [
+        {
+            "answer_total_votes_percentage": "over-total-votes",
+            "answers": [
+                {
+                    "category": "",
+                    "details": "",
+                    "id": 0,
+                    "sort_order": 0,
+                    "text": "opción a",
+                    "urls": []
+                },
+                {
+                    "category": "",
+                    "details": "",
+                    "id": 1,
+                    "sort_order": 1,
+                    "text": "opción b",
+                    "urls": []
+                },
+                {
+                    "category": "",
+                    "details": "",
+                    "id": 2,
+                    "sort_order": 2,
+                    "text": "opción c",
+                    "urls": []
+                }
+            ],
+            "description": "Yeah\",h",
+            "layout": "simple",
+            "max": 1,
+            "min": 0,
+            "num_winners": 1,
+            "randomize_answer_order": true,
+            "tally_type": "plurality-at-large",
+            "title": "¿Qué?"
+        }
+    ],
+    "start_date": "2015-01-20T23:59:00.001",
+    "title": "Votación"
+}

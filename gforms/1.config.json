@@ -1,0 +1,42 @@
+{
+    "hmac": ["superuser:11114341", "deadbeefdeadbeef"],
+    "name": "test",
+    "auth_method": "sms-code",
+    "config": {
+        "SMS_PROVIDER": "console",
+        "SMS_DOMAIN_ID": "",
+        "SMS_LOGIN": "",
+        "SMS_PASSWORD": "",
+        "SMS_URL": "",
+        "SMS_SENDER_ID": "",
+        "SMS_VOICE_LANG_CODE": "",
+        "sms-message": "Confirm your sms code: "
+    },
+    "pipeline": {
+        "register-pipeline": [
+            ["check_whitelisted", {"field": "tlf"}],
+            ["check_whitelisted", {"field": "ip"}],
+            ["check_blacklisted", {"field": "ip"}],
+            ["check_blacklisted", {"field": "tlf"}],
+            ["check_total_max", {"field": "ip", "max": 8}],
+            ["check_total_max", {"field": "tlf", "max": 7}],
+            ["check_total_max", {"field": "tlf", "period": 1440, "max": 5}],
+            ["check_total_max", {"field": "tlf", "period": 60, "max": 3}]
+        ],
+        "validate-pipeline": [
+            ["check_total_connection", {"times": 5 }],
+            ["check_sms_code", {"timestamp": 5 }]
+        ]
+    },
+    "metadata": {
+        "fieldsRegister": [
+            {"name": "email", "type": "text", "required": true},
+            {"name": "tlf", "type": "text", "required": true, "max": 12}
+        ],
+        "fieldsValidate": [
+            {"name": "email", "type": "text", "required": true},
+            {"name": "tlf", "type": "text", "required": true, "max": 12},
+            {"name": "code", "type": "password", "required": true, "min": 4}
+        ]
+    }
+}
