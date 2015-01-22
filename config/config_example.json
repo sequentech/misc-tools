@@ -34,6 +34,7 @@
     "password": "admin",
     "event-id": 0,
     "url": "http://localhost:8000/api/",
+    "auth_code_message": "Your code to authenticate to vote in __URL__ is __CODE__",
     "event_config": {
       "auth_method": "sms-code",
       "auth_method_config": {

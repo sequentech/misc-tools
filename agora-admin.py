@@ -99,6 +99,19 @@ def statusAuthevent(aeid, status):
         print(req.text)
         return False
 
+def send_auth_codes():
+    '''
+    Sends auth codes to the census
+    '''
+    global headers
+    base_url = ADMIN_CONFIG['authapi']['url']
+    payload = {
+        "message": ADMIN_CONFIG['authapi']['auth_code_message']
+    }
+    req = requests.post(base_url + 'auth-event/%d/census/send_auth/' % aeid,
+            headers=headers, data=payload)
+    print(req.status_code, req.text)
+
 def createElection(config, aeid):
     '''
     Create election on agora-elections
@@ -127,6 +140,8 @@ if __name__ == "__main__":
             help="id authevent for start")
     parser.add_argument("--stop", type=check_positive_id,
             help="id authevent for stop")
+    parser.add_argument("--send-auth-codes", type=check_positive_id,
+            help="id authevent for sending auth codes")
 
     args = parser.parse_args()
 
@@ -161,5 +176,9 @@ if __name__ == "__main__":
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.stop)
         statusAuthevent(args.stop, 'stop')
+    elif args.send_auth_codes:
+        headers = login()
+        getperm(obj_type="AuthEvent", perm="edit", obj_id=args.send_auth_codes)
+        sned_auth_codes(args.send_auth_codes)
     else:
         print(args)
