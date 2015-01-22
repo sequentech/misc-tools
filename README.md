@@ -1,21 +1,55 @@
-agora-admin.py
-==============
+# agora-admin.py script
 
-Scritp para crear auth-event, añadir un censo y comenzar o parar el auth-event
+## Introduction
 
-Uso:
+Script to manage elections using both agora-elections and authapi together. It
+allows to:
+  - create an election with a census
+  - start or stop the election in authapi
+  - send auth messages to the census
 
-Cambiar en el script el usuario administrador que tengamos en authapi y las url de las apis.
+This script does not (currently) pretend to allow to do all the actions related
+to agora-elections or authapi, only those related to authapi. In cases those
+actions are also related to agora-elections and if it makes sense, like creating
+an election in both, then it allows that. But the admin/admin.py script from
+agora-elections still manages other agora-elections specific tasks like doing
+a tally, for example.
 
-Necesitamos 3 ficheros de configuración: id.json, id.config.json e id.census.json, dentro de la
-carpeta /gforms tenemos 2 ejemplos. Para generar el auth-event y añadir el censo, hacemos lo
-siguiente:
+## Usage
 
-    ./agora-admin.py --create gforms/<id>
+For any of the actions, you need to provide the --config file (see
+config/config_example.json for an example):
 
-El comando nos mostrará en la salida el id del auth-event creado, el cual usaremos para comenzar o
-parar el auth-event de la siguiente manera:
+    ./agora-admin --config config/config_example.json
 
-    ./agora-admin.py --start id
-    ./agora-admin.py --stop id
+Then you execute any of the actions:
 
+### Create elections
+
+To create an election with a census both in agora-elections and authapi, you
+need to provide a directory with numbered files so that for each election you
+have 3 files: **id**.json, **id**.census.json and **id**.config.json. These
+files can be generated with the  import_elections_csv.py script or by other
+means. For example:
+
+    $ ls data/example
+    781.json 781.json 781.config.json
+
+    $ ./agora-admin.py --config config/config_example.json --create data/example
+
+Note that the ids of the files are only to attach the files together, because
+the id is actually set on creation by authapi and printed on screen.
+
+# Start or stop an election
+
+You can start or stop an election in authapi following this example:
+
+    $ ./agora-admin.py --config config/config_example.json --start id
+    $ ./agora-admin.py --config config/config_example.json --stop id
+
+# Send authentication codes to census
+
+To send the authentication codes to the census using the message format
+specified in the config file, use:
+
+    $ ./agora-admin.py --config config/config_example.json --send-auth-codes id
