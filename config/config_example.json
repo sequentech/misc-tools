@@ -1,0 +1,44 @@
+{
+  "director": "agora-auth5",
+  "authorities": ["openkratio-auth2"],
+  "agora_results_config": [
+    [
+      "agora_results.pipes.results.do_tallies",
+      {"ignore_invalid_votes": true}
+    ]
+  ],
+  "agora_results_config_sorting": [
+    [
+      "agora_results.pipes.sort_plurality_at_large.sort_plurality_at_large",
+      {"withdrawals": []}
+    ]
+  ],
+  "agora_results_config_parity": {
+    "sexes_tsv": "paridad.tsv",
+    "method": "podemos_proportion_rounded_and_duplicates",
+    "proportions": [60, 40]
+  },
+  "agora_elections_base_url": "http://localhost:9000/api",
+  "agora_results_bin_path": "/home/agoraelections/agora-tools/agora_results.sh",
+  "agora_elections_private_datastore_path": "/home/agoraelections/agora-elections/datastore/private/",
+  "global_prechanges": [
+    [
+      "map_question_maximums_and_winners",
+      {
+        "mapping":[[7, 6], [11, 10], [17, 16], [21, 20], [25, 24]]
+      }
+    ]
+  ],
+  "authapi": {
+    "username": "admin",
+    "password": "admin",
+    "event-id": 0,
+    "url": "http://localhost:8000/api/",
+    "event_config": {
+      "auth_method": "sms-code",
+      "auth_method_config": {
+      },
+      "extra-fields": []
+    }
+  }
+}
