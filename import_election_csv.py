@@ -276,7 +276,9 @@ if __name__ == '__main__':
                 with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
                     f.write(serialize(election))
             else:
-                if not os.path.isdir(args.output_path):
+                if not os.path.exists(args.output_path):
+                    os.makedirs(args.output_path)
+                elif not os.path.isdir(args.output_path):
                     print("output path must be a directory")
                     exit(2)
 
