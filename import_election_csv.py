@@ -293,6 +293,10 @@ if __name__ == '__main__':
                     fpath = os.path.join(args.output_path, "%d.json" % election["id"])
                     with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
                         f.write(serialize(election))
+
+                    fpath = os.path.join(args.output_path, "%d.config.json" % election["id"])
+                    with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
+                        f.write(serialize(config['authapi']['event_config']))
         except:
             print("malformed CSV")
             import traceback

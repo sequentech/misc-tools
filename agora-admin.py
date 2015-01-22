@@ -1,33 +1,37 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
 import json
 import requests
 from datetime import datetime
 from requests.auth import HTTPBasicAuth
 
-AUTH = ({'username': 'admin', 'password': 'admin'}, 0) # auth, event
-#AUTH = ({'email': 'test@test.com', 'password': 'test'}, 16)
-
-AUTHAPI = 'http://localhost:8000/api/'
-AGORA_ELECTION = 'http://localhost:4000/api/'
-
+ADMIN_CONFIG = None
+KHMAC = None
 
 def loadJson(filename):
-    f = open(filename, 'r')
+    '''Load json file'''
+    f = open(filename, 'r', encoding="utf-8", errors='strict')
     data = json.load(f)
     f.close()
     return data
 
-
-def login(auth):
+def login():
     """ Login and return the neccesary headers """
     global headers
-    req = requests.post(AUTHAPI + 'auth-event/%d/login/' % auth[1], json=auth[0])
+    base_url = ADMIN_CONFIG['authapi']['url']
+    event_id = ADMIN_CONFIG['authapi']['event-id']
+    crendentials = {
+        "username": ADMIN_CONFIG['authapi']['username'],
+        "password": ADMIN_CONFIG['authapi']['password']
+    }
+    req = requests.post(base_url + 'auth-event/%d/login/' % event_id,
+        json=credentials)
     if req.status_code != 200:
         print(req.text)
         exit()
-    auth_token = json.loads(req.text)['auth-token']
+    auth_token = req.json()['auth-token']
     headers={'AUTH': auth_token}
     return headers
 
@@ -35,13 +39,16 @@ def login(auth):
 def getperm(obj_type, perm, obj_id=None):
     """ Check if the user have permission """
     global headers
+    global KHMAC
+    base_url = ADMIN_CONFIG['authapi']['url']
     perms = {"object_type": obj_type, "permission": perm}
     if obj_id:
         perms['object_id'] = obj_id
-    req = requests.post(AUTHAPI + 'get-perms/', json=perms, headers=headers)
-    if req.status_code != 200 or not json.loads(req.text)['permission-token']:
+    req = requests.post(base_url + 'get-perms/', json=perms, headers=headers)
+    if req.status_code != 200 or not req.json()['permission-token']:
         print(req.text)
         exit()
+    KHMAC = req.json()['permission-token']
     return True
 
 
@@ -51,12 +58,13 @@ def createAuthevent(config):
     Return the id of created authevent.
     """
     global headers
-    req = requests.post(AUTHAPI + 'auth-event/', json=config,
-            headers=headers)
+    base_url = ADMIN_CONFIG['authapi']['url']
+    req = requests.post(base_url + 'auth-event/', json=config,
+        headers=headers)
     if req.status_code != 200:
         print(req.text)
         exit()
-    aeid = json.loads(req.text)['id']
+    aeid = req.json()['id']
     return aeid
 
 
@@ -66,12 +74,13 @@ def addCensus(aeid, census):
     Return ok if added correct or the user errors if added wrong.
     """
     global headers
-    req = requests.post(AUTHAPI + 'auth-event/%d/census/' % aeid, json=census,
+    base_url = ADMIN_CONFIG['authapi']['url']
+    req = requests.post(base_url + 'auth-event/%d/census/' % aeid, json=census,
             headers=headers)
     if req.status_code != 200:
         print(req.text)
         exit()
-    msg = json.loads(req.text)
+    msg = req.json()
     return msg
 
 
@@ -81,7 +90,8 @@ def statusAuthevent(aeid, status):
     Return ok if change correct or error if not status changed.
     """
     global headers
-    req = requests.post(AUTHAPI + 'auth-event/%d/%s/' % (aeid, status),
+    base_url = ADMIN_CONFIG['authapi']['url']
+    req = requests.post(base_url + 'auth-event/%d/%s/' % (aeid, status),
             headers=headers)
     if req.status_code == 200:
         return True
@@ -89,6 +99,15 @@ def statusAuthevent(aeid, status):
         print(req.text)
         return False
 
+def createElection(config, aeid):
+    '''
+    Create election on agora-elections
+    '''
+    base_url = ADMIN_CONFIG['agora_elections_base_url']
+    headers = {'content-type': 'application/json', 'Authorization': KHMAC}
+    url = 'http://%s:%d/api/election' % (host, port)
+    r = requests.post(url, data=config, headers=headers)
+    print(r.status_code, r.text)
 
 if __name__ == "__main__":
 
@@ -101,7 +120,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-c", "--create",
-            help="path to the dir containing config json.")
+            help="path to the dir containing json configuration.")
+    parser.add_argument("-C", "--config", required=True,
+            help="path to the agora-admin configuration file.")
     parser.add_argument("--start", type=check_positive_id,
             help="id authevent for start")
     parser.add_argument("--stop", type=check_positive_id,
@@ -109,28 +130,35 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if not os.access(args.config, os.R_OK):
+      print("can't read %s" % args.config)
+      exit(1)
+
+    ADMIN_CONFIG = loadJson(args.config)
+
     if args.create:
         ae = args.create + ".json"
         census = args.create + ".census.json"
-        config = args.create + ".config.json"
 
         json_ae = loadJson(ae)
         json_census = loadJson(census)
         json_config = loadJson(config)
 
-        headers = login(AUTH)
+        headers = login()
         getperm(obj_type="AuthEvent", perm="create")
         aeid = createAuthevent(json_config)
         print("Created auth-event with id ", aeid)
         msg = addCensus(aeid, json_census)
         print("Added census.")
+        getperm(obj_type="AuthEvent", perm="edit", obj_id=aeid)
+        createElection(json_ae, aeid)
 
     elif args.start:
-        headers = login(AUTH)
+        headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.start)
         statusAuthevent(args.start, 'start')
     elif args.stop:
-        headers = login(AUTH)
+        headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.stop)
         statusAuthevent(args.stop, 'stop')
     else:
