@@ -1,3 +1,15 @@
+# import_election_csv.py script
+
+This scripts allows to import an election from diferent easily interchangable
+formats.
+
+For example, you can use a google forms to get a rough configuration of multiple
+elections in CSV, and then just provide this file as an input, and the output
+will be a directory where multiple configuration files will be created per
+election:
+
+    python3 import_election_csv.py --config config/config_example.py -i data/test.csv -o data/test-dir -f csv-google-forms
+
 # agora-admin.py script
 
 ## Introduction
@@ -22,6 +34,9 @@ config/config_example.json for an example):
 
     ./agora-admin --config config/config_example.json
 
+This configuration file format is shared/global with other agora-tools commands
+like import_election_csv.py or config_updates.py
+
 Then you execute any of the actions:
 
 ### Create elections
@@ -29,7 +44,7 @@ Then you execute any of the actions:
 To create an election with a census both in agora-elections and authapi, you
 need to provide a directory with numbered files so that for each election you
 have 3 files: **id**.json, **id**.census.json and **id**.config.json. These
-files can be generated with the  import_elections_csv.py script or by other
+files can be generated with the  import_election_csv.py script or by other
 means. For example:
 
     $ ls data/example

@@ -17,20 +17,25 @@ def loadJson(filename):
     f.close()
     return data
 
+def request_post(url, *args, **kwargs):
+    print("POST %s" % url)
+    req = requests.post(url, *args, **kwargs)
+    print(req.status_code, req.text)
+    return req
+
 def login():
     """ Login and return the neccesary headers """
     global headers
     base_url = ADMIN_CONFIG['authapi']['url']
     event_id = ADMIN_CONFIG['authapi']['event-id']
-    crendentials = {
+    credentials = {
         "username": ADMIN_CONFIG['authapi']['username'],
         "password": ADMIN_CONFIG['authapi']['password']
     }
-    req = requests.post(base_url + 'auth-event/%d/login/' % event_id,
-        json=credentials)
+    req = request_post(base_url + 'auth-event/%d/authenticate/' % event_id,
+        data=json.dumps(credentials))
     if req.status_code != 200:
-        print(req.text)
-        exit()
+        exit(1)
     auth_token = req.json()['auth-token']
     headers={'AUTH': auth_token}
     return headers
@@ -44,10 +49,9 @@ def getperm(obj_type, perm, obj_id=None):
     perms = {"object_type": obj_type, "permission": perm}
     if obj_id:
         perms['object_id'] = obj_id
-    req = requests.post(base_url + 'get-perms/', json=perms, headers=headers)
+    req = request_post(base_url + 'get-perms/', data=json.dumps(perms), headers=headers)
     if req.status_code != 200 or not req.json()['permission-token']:
-        print(req.text)
-        exit()
+        exit(1)
     KHMAC = req.json()['permission-token']
     return True
 
@@ -59,11 +63,10 @@ def createAuthevent(config):
     """
     global headers
     base_url = ADMIN_CONFIG['authapi']['url']
-    req = requests.post(base_url + 'auth-event/', json=config,
+    req = request_post(base_url + 'auth-event/', data=json.dumps(config),
         headers=headers)
     if req.status_code != 200:
-        print(req.text)
-        exit()
+        exit(1)
     aeid = req.json()['id']
     return aeid
 
@@ -75,10 +78,9 @@ def addCensus(aeid, census):
     """
     global headers
     base_url = ADMIN_CONFIG['authapi']['url']
-    req = requests.post(base_url + 'auth-event/%d/census/' % aeid, json=census,
+    req = request_post(base_url + 'auth-event/%d/census/' % aeid, data=json.dumps(census),
             headers=headers)
     if req.status_code != 200:
-        print(req.text)
         exit()
     msg = req.json()
     return msg
@@ -91,12 +93,11 @@ def statusAuthevent(aeid, status):
     """
     global headers
     base_url = ADMIN_CONFIG['authapi']['url']
-    req = requests.post(base_url + 'auth-event/%d/%s/' % (aeid, status),
+    req = request_post(base_url + 'auth-event/%d/%s/' % (aeid, status),
             headers=headers)
     if req.status_code == 200:
         return True
     else:
-        print(req.text)
         return False
 
 def send_auth_codes():
@@ -108,19 +109,20 @@ def send_auth_codes():
     payload = {
         "message": ADMIN_CONFIG['authapi']['auth_code_message']
     }
-    req = requests.post(base_url + 'auth-event/%d/census/send_auth/' % aeid,
-            headers=headers, data=payload)
-    print(req.status_code, req.text)
+    req = request_post(base_url + 'auth-event/%d/census/send_auth/' % aeid,
+            headers=headers, data=json.dumps(payload))
 
 def createElection(config, aeid):
     '''
     Create election on agora-elections
     '''
+    global KHMAC
     base_url = ADMIN_CONFIG['agora_elections_base_url']
     headers = {'content-type': 'application/json', 'Authorization': KHMAC}
-    url = 'http://%s:%d/api/election' % (host, port)
-    r = requests.post(url, data=config, headers=headers)
-    print(r.status_code, r.text)
+    url = '%selection/%d' % (base_url, aeid)
+    r = request_post(url, data=json.dumps(config), headers=headers)
+    if r.status_code != 200:
+        exit(1)
 
 if __name__ == "__main__":
 
@@ -152,21 +154,32 @@ if __name__ == "__main__":
     ADMIN_CONFIG = loadJson(args.config)
 
     if args.create:
-        ae = args.create + ".json"
-        census = args.create + ".census.json"
+        if not os.path.isdir(args.create):
+            print("--create must bea a directory")
+            exit(1)
 
-        json_ae = loadJson(ae)
-        json_census = loadJson(census)
-        json_config = loadJson(config)
+        fids = [fname.replace(".census.json", "")
+            for fname in os.listdir(args.create)
+            if fname.endswith(".census.json")]
 
         headers = login()
-        getperm(obj_type="AuthEvent", perm="create")
-        aeid = createAuthevent(json_config)
-        print("Created auth-event with id ", aeid)
-        msg = addCensus(aeid, json_census)
-        print("Added census.")
-        getperm(obj_type="AuthEvent", perm="edit", obj_id=aeid)
-        createElection(json_ae, aeid)
+        for fid in fids:
+            ae = fid + ".json"
+            census = fid + ".census.json"
+            config = fid + ".config.json"
+
+            json_ae = loadJson(os.path.join(args.create, ae))
+            json_census = loadJson(os.path.join(args.create, census))
+            json_config = loadJson(os.path.join(args.create, config))
+
+            getperm(obj_type="AuthEvent", perm="create")
+            aeid = createAuthevent(json_config)
+            print("Created auth-event with id ", aeid)
+            msg = addCensus(aeid, json_census)
+            print("Added census.")
+            getperm(obj_type="AuthEvent", perm="edit", obj_id=aeid)
+            json_ae['id'] = aeid
+            createElection(json_ae, aeid)
 
     elif args.start:
         headers = login()

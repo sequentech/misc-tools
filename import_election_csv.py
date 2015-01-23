@@ -141,7 +141,7 @@ def form_to_elections(path, separator, config, add_to_id):
     '''
     election_funcs = {
         "Título": lambda d: ["title", d],
-        "Descripción": lambda d: ["descripcion", d],
+        "Descripción": lambda d: ["description", d],
         "Comienzo": lambda d: ["start_date", datetime.strptime(d, "%m/%d/%Y %H:%M:%S").isoformat()+ ".001"],
         "Final": lambda d: ["end_date", datetime.strptime(d, "%m/%d/%Y %H:%M:%S").isoformat()+ ".001"],
     }
@@ -149,6 +149,7 @@ def form_to_elections(path, separator, config, add_to_id):
     more_keys = {
         "¿Más preguntas?": lambda v: "No" not in v
     }
+    auth_method = config['authapi']['event_config']['auth_method']
     question_options_key = "Opciones"
     question_funcs = {
         "Título": lambda d: ["title", d],
@@ -161,6 +162,9 @@ def form_to_elections(path, separator, config, add_to_id):
     }
 
     elections = []
+    base_election = copy.deepcopy(BASE_ELECTION)
+    base_election['director'] = config['director']
+    base_election['authorities'] = config['authorities']
     with open(path, mode='r', encoding="utf-8", errors='strict') as f:
         fcsv = csv.reader(f, delimiter=',', quotechar='"')
         keys = fcsv.__next__()
@@ -169,7 +173,7 @@ def form_to_elections(path, separator, config, add_to_id):
                 continue
 
             question_num = -1
-            election = copy.deepcopy(BASE_ELECTION)
+            election = copy.deepcopy(base_election)
             election['id'] = add_to_id + len(elections)
             question = None
 
@@ -178,7 +182,10 @@ def form_to_elections(path, separator, config, add_to_id):
                     dest_key, dest_value =  election_funcs[key](value)
                     election[dest_key] = dest_value
                 elif key == census_key:
-                    election['census'] = value.split("\n")
+                    if auth_method == "sms":
+                        election['census'] = [{"tlf": item} for item in value.split("\n")]
+                    else: # email
+                        election['census'] = [{"email": item} for item in value.split("\n")]
                     question_num += 1
                     question = copy.deepcopy(BASE_QUESTION)
                 elif question_num >= 0 and key in question_funcs.keys():
