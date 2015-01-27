@@ -206,11 +206,12 @@ if __name__ == "__main__":
             json_config = loadJson(os.path.join(args.create, config))
 
             # modify email title
-            if "title" in json_config['auth_method_config']:
-                json_config['auth_method_config']['title'] = json_config['auth_method_config']['title'] % dict(
+            if "subject" in json_config['auth_method_config']:
+                json_config['auth_method_config']['subject'] = json_config['auth_method_config']['subject'] % dict(
                     title=json_ae['title'])
 
             getperm(obj_type="AuthEvent", perm="create")
+
             aeid = createAuthevent(json_config)
             print("Created auth-event with id ", aeid)
             msg = addCensus(aeid, json_census)
