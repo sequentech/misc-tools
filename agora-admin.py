@@ -108,7 +108,7 @@ def send_auth_codes(aeid):
     global headers
     base_url = ADMIN_CONFIG['authapi']['url']
     payload = {
-        "message": ADMIN_CONFIG['authapi']['auth_code_message']
+        "template": ADMIN_CONFIG['authapi']['auth_code_message']
     }
     req = request_post(base_url + 'auth-event/%d/census/send_auth/' % aeid,
             headers=headers, data=json.dumps(payload))
