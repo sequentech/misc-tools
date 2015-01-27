@@ -17,6 +17,13 @@ def loadJson(filename):
     f.close()
     return data
 
+def request_get(url, *args, **kwargs):
+    print("GET %s" % url)
+    kwargs['verify'] = False
+    req = requests.get(url, *args, **kwargs)
+    print(req.status_code, req.text)
+    return req
+
 def request_post(url, *args, **kwargs):
     print("POST %s" % url)
     kwargs['verify'] = False
@@ -126,10 +133,19 @@ def createElection(config, aeid):
     if r.status_code != 200:
         exit(1)
     # create
-    url = '%selection/%d/create' % (base_url, aeid)
-    r = request_post(url, headers=headers)
+    electionCommand(aeid, "create")
+
+
+def electionCommand(aeid, command, method="POST"):
+    global KHMAC
+    base_url = ADMIN_CONFIG['agora_elections_base_url']
+    headers = {'content-type': 'application/json', 'Authorization': KHMAC}
+    url = '%selection/%d/%s' % (base_url, aeid, command)
+    method = request_post if method == "POST" else request_get
+    r = method(url, data=json.dumps({}), headers=headers)
     if r.status_code != 200:
         exit(1)
+    return r
 
 
 if __name__ == "__main__":
@@ -150,6 +166,14 @@ if __name__ == "__main__":
             help="id authevent for start")
     parser.add_argument("--stop", type=check_positive_id,
             help="id authevent for stop")
+    parser.add_argument("--tally", type=check_positive_id,
+            help="election id to tally")
+    parser.add_argument("--calculate", type=check_positive_id,
+            help="election id to calculate")
+    parser.add_argument("--results", type=check_positive_id,
+            help="election id to get")
+    parser.add_argument("--publish", type=check_positive_id,
+            help="election id to publish")
     parser.add_argument("--send-auth-codes", type=check_positive_id,
             help="id authevent for sending auth codes")
 
@@ -193,13 +217,32 @@ if __name__ == "__main__":
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.start)
         statusAuthevent(args.start, 'started')
+        electionCommand(args.start, "start")
     elif args.stop:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.stop)
         statusAuthevent(args.stop, 'stopped')
+        electionCommand(args.stop, "stop")
     elif args.send_auth_codes:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.send_auth_codes)
         send_auth_codes(args.send_auth_codes)
+    elif args.tally:
+        headers = login()
+        getperm(obj_type="AuthEvent", perm="edit", obj_id=args.tally)
+        electionCommand(args.tally, "tally")
+    elif args.calculate:
+        headers = login()
+        getperm(obj_type="AuthEvent", perm="edit", obj_id=args.calculate)
+        electionCommand(args.calculate, "calculate-results")
+    elif args.results:
+        headers = login()
+        getperm(obj_type="AuthEvent", perm="get-results", obj_id=args.results)
+        electionCommand(args.results, "results", method="GET")
+    elif args.publish:
+        headers = login()
+        getperm(obj_type="AuthEvent", perm="edit", obj_id=args.publish)
+        electionCommand(args.publish, "publish-results")
+
     else:
         print(args)
