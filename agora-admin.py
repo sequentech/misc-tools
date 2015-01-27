@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
             # modify email title
             if "title" in json_config['auth_method_config']:
-                json_config['auth_method_config']['title'] % dict(
+                json_config['auth_method_config']['title'] = json_config['auth_method_config']['title'] % dict(
                     title=json_ae['title'])
 
             getperm(obj_type="AuthEvent", perm="create")
