@@ -19,6 +19,7 @@ def loadJson(filename):
 
 def request_post(url, *args, **kwargs):
     print("POST %s" % url)
+    kwargs['verify'] = False
     req = requests.post(url, *args, **kwargs)
     print(req.status_code, req.text)
     return req
@@ -100,7 +101,7 @@ def statusAuthevent(aeid, status):
     else:
         return False
 
-def send_auth_codes():
+def send_auth_codes(aeid):
     '''
     Sends auth codes to the census
     '''
@@ -120,9 +121,16 @@ def createElection(config, aeid):
     base_url = ADMIN_CONFIG['agora_elections_base_url']
     headers = {'content-type': 'application/json', 'Authorization': KHMAC}
     url = '%selection/%d' % (base_url, aeid)
+    # register
     r = request_post(url, data=json.dumps(config), headers=headers)
     if r.status_code != 200:
         exit(1)
+    # create
+    url = '%selection/%d/create' % (base_url, aeid)
+    r = request_post(url, headers=headers)
+    if r.status_code != 200:
+        exit(1)
+
 
 if __name__ == "__main__":
 
@@ -184,14 +192,14 @@ if __name__ == "__main__":
     elif args.start:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.start)
-        statusAuthevent(args.start, 'start')
+        statusAuthevent(args.start, 'started')
     elif args.stop:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.stop)
-        statusAuthevent(args.stop, 'stop')
+        statusAuthevent(args.stop, 'stopped')
     elif args.send_auth_codes:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.send_auth_codes)
-        sned_auth_codes(args.send_auth_codes)
+        send_auth_codes(args.send_auth_codes)
     else:
         print(args)
