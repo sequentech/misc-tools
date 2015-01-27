@@ -136,13 +136,14 @@ def createElection(config, aeid):
     electionCommand(aeid, "create")
 
 
-def electionCommand(aeid, command, method="POST"):
+def electionCommand(aeid, command, method="POST", data=None):
     global KHMAC
     base_url = ADMIN_CONFIG['agora_elections_base_url']
     headers = {'content-type': 'application/json', 'Authorization': KHMAC}
     url = '%selection/%d/%s' % (base_url, aeid, command)
     method = request_post if method == "POST" else request_get
-    r = method(url, data=json.dumps({}), headers=headers)
+    data = data or {}
+    r = method(url, data=json.dumps(data), headers=headers)
     if r.status_code != 200:
         exit(1)
     return r
@@ -234,7 +235,8 @@ if __name__ == "__main__":
     elif args.calculate:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.calculate)
-        electionCommand(args.calculate, "calculate-results")
+        data = ADMIN_CONFIG['agora_results_config']
+        electionCommand(args.calculate, "calculate-results", data=data)
     elif args.results:
         headers = login()
         getperm(obj_type="AuthEvent", perm="get-results", obj_id=args.results)
