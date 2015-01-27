@@ -8,7 +8,7 @@ elections in CSV, and then just provide this file as an input, and the output
 will be a directory where multiple configuration files will be created per
 election:
 
-    python3 import_election_csv.py --config config/config_example.py -i data/test.csv -o data/test-dir -f csv-google-forms
+    python3 import_election_csv.py --config config/config_example.json -i config/test.csv -o config/test-dir -f csv-google-forms
 
 # agora-admin.py script
 
