@@ -68,3 +68,13 @@ To send the authentication codes to the census using the message format
 specified in the config file, use:
 
     $ ./agora-admin.py --config config/config_example.json --send-auth-codes id
+
+### Agora admin complete election:
+
+- $ ./agora-admin.py -C vota1.config.json -c data/vota1/
+- $ ./agora-admin.py -C vota1.config.json --start ID
+- $ ./agora-admin.py -C vota1.config.json --send-auth-codes ID
+- $ ./agora-admin.py -C vota1.config.json --stop ID
+- $ ./agora-admin.py -C vota1.config.json --tally ID
+- $ ./agora-admin.py -C vota1.config.json --calculate ID
+- $ ./agora-admin.py -C vota1.config.json --publish ID
