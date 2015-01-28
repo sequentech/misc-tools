@@ -256,7 +256,24 @@ if __name__ == "__main__":
     elif args.voters:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.voters)
-        electionCommand(args.voters, "voters", method="GET")
+        r = electionCommand(args.voters, "voters", method="GET").json()
+        voters = r['payload']
+
+        headers = login()
+
+        eid = args.voters
+        base_url = ADMIN_CONFIG['authapi']['url']
+        url = '%sauth-event/%s/census/' % (base_url, eid)
+        req = request_get(url, data=json.dumps({}), headers=headers)
+        if req.status_code != 200:
+            exit(1)
+        response = req.json()
+        census = response['users']
+
+        print("\nVOTERS: ")
+        for i in voters:
+            print(census[i])
+        print("\n")
 
     else:
         print(args)
