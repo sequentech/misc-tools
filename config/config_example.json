@@ -39,7 +39,7 @@
       "auth_method": "sms",
       "auth_method_config": {
       },
-      "extra-fields": []
+      "extra_fields": []
     }
   }
 }

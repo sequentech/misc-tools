@@ -71,10 +71,10 @@ specified in the config file, use:
 
 ### Agora admin complete election:
 
-- $ ./agora-admin.py -C vota1.config.json -c data/vota1/
-- $ ./agora-admin.py -C vota1.config.json --start ID
-- $ ./agora-admin.py -C vota1.config.json --send-auth-codes ID
-- $ ./agora-admin.py -C vota1.config.json --stop ID
-- $ ./agora-admin.py -C vota1.config.json --tally ID
-- $ ./agora-admin.py -C vota1.config.json --calculate ID
-- $ ./agora-admin.py -C vota1.config.json --publish ID
+    $ ./agora-admin.py -C vota1.config.json -c data/vota1/
+    $ ./agora-admin.py -C vota1.config.json --start ID
+    $ ./agora-admin.py -C vota1.config.json --send-auth-codes ID
+    $ ./agora-admin.py -C vota1.config.json --stop ID
+    $ ./agora-admin.py -C vota1.config.json --tally ID
+    $ ./agora-admin.py -C vota1.config.json --calculate ID
+    $ ./agora-admin.py -C vota1.config.json --publish ID
