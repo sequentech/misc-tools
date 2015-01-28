@@ -175,6 +175,8 @@ if __name__ == "__main__":
             help="election id to get")
     parser.add_argument("--publish", type=check_positive_id,
             help="election id to publish")
+    parser.add_argument("--voters", type=check_positive_id,
+            help="shows the election voters")
     parser.add_argument("--send-auth-codes", type=check_positive_id,
             help="id authevent for sending auth codes")
 
@@ -245,12 +247,16 @@ if __name__ == "__main__":
         electionCommand(args.calculate, "calculate-results", data=data)
     elif args.results:
         headers = login()
-        getperm(obj_type="AuthEvent", perm="get-results", obj_id=args.results)
+        getperm(obj_type="AuthEvent", perm="edit", obj_id=args.results)
         electionCommand(args.results, "results", method="GET")
     elif args.publish:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.publish)
         electionCommand(args.publish, "publish-results")
+    elif args.voters:
+        headers = login()
+        getperm(obj_type="AuthEvent", perm="edit", obj_id=args.voters)
+        electionCommand(args.voters, "voters", method="GET")
 
     else:
         print(args)
