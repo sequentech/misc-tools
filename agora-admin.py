@@ -108,15 +108,18 @@ def statusAuthevent(aeid, status):
     else:
         return False
 
-def send_auth_codes(aeid):
+def send_auth_codes(aeid, subject=None, msg=None):
     '''
     Sends auth codes to the census
     '''
+    print("S", subject, msg)
     global headers
     base_url = ADMIN_CONFIG['authapi']['url']
-    payload = {
-        "template": ADMIN_CONFIG['authapi']['auth_code_message']
-    }
+    payload = {}
+    if subject:
+        payload['subject'] = subject
+    if msg:
+        payload['msg'] = msg
     req = request_post(base_url + 'auth-event/%d/census/send_auth/' % aeid,
             headers=headers, data=json.dumps(payload))
 
@@ -179,6 +182,8 @@ if __name__ == "__main__":
             help="shows the election voters")
     parser.add_argument("--send-auth-codes", type=check_positive_id,
             help="id authevent for sending auth codes")
+    parser.add_argument("--subject", help="subject used for send-auth-codes")
+    parser.add_argument("-m", "--msg", help="message used for send-auth-codes")
 
     args = parser.parse_args()
 
@@ -235,7 +240,7 @@ if __name__ == "__main__":
     elif args.send_auth_codes:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.send_auth_codes)
-        send_auth_codes(args.send_auth_codes)
+        send_auth_codes(args.send_auth_codes, args.subject, args.msg)
     elif args.tally:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.tally)
