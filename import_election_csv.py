@@ -102,6 +102,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
               if len("".join(answer.values())) > 0
             ]
         }
+
         # check answers
         assert len(data['answers']) == len(set(map(operator.itemgetter('text'), data['answers'])))
         data['max'] = min(data['max'], len(data['answers']))
@@ -116,10 +117,15 @@ def blocks_to_election(blocks, config, add_to_id=0):
         questions.append(data)
 
 
-    start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M:%S")
-    ret = config
-    ret.update({
+    try:
+        start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M:%S")
+    except:
+        start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M")
+
+    ret = {
         "id": int(election['Id']) + add_to_id,
+        "authorities": config['authorities'],
+        "director": config['director'],
         "title": election['Title'],
         "description": election['Description'],
         "layout": election.get('Layout', ''),
@@ -132,7 +138,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
         "end_date": (start_date + timedelta(hours=int(election['Duration in hours']))).isoformat() + ".001",
         "start_date": start_date.isoformat() + ".001",
         "questions": questions
-    })
+    }
     return ret
 
 def form_to_elections(path, separator, config, add_to_id):
@@ -241,40 +247,32 @@ if __name__ == '__main__':
     with open(args.config_path, mode='r', encoding="utf-8", errors='strict') as f:
         config = json.loads(f.read())
 
-    if os.path.isdir(args.input_path) and os.path.isdir(args.output_path):
-        for fname in os.listdir(args.input_path):
-            full_path = os.path.join(args.input_path, fname)
-            if os.path.isdir(full_path):
-                continue
+    try:
+        if args.format == "tsv-blocks":
+            if os.path.isdir(args.input_path):
+                if not os.path.exists(args.output_path):
+                    os.makedirs(args.output_path)
+                i = 0
+                files = sorted([name for name in os.listdir(args.input_path)
+                            if os.path.isfile(os.path.join(args.input_path, name))])
+                for name in files:
+                    file_path = os.path.join(args.input_path, name)
+                    blocks = csv_to_blocks(path=file_path, separator="\t")
+                    election = blocks_to_election(blocks, config, args.add_to_id)
+                    output_path = os.path.join(args.output_path, str(election['id']) + ".config.json")
+                    i += i + 1
 
-            try:
-                blocks = csv_to_blocks(path=full_path, separator="\t")
-                election = blocks_to_election(blocks, config, args.add_to_id)
-                fname = fname.replace(str(election["id"] - args.add_to_id), str(election["id"]))
-            except:
-                print("malformed CSV, %s" % fname)
-                import traceback
-                traceback.print_exc()
-                continue
+                    with open(output_path, mode='w', encoding="utf-8", errors='strict') as f:
+                        f.write(serialize(election))
 
-            with open(
-                    os.path.join(args.output_path, fname.replace(".tsv", ".config.json")),
-                    mode='w',
-                    encoding="utf-8",
-                    errors='strict') as f:
-                f.write(serialize(election))
-
-            if config.get('agora_results_config', None) is not None:
-                with open(
-                        os.path.join(args.output_path, fname.replace(".tsv", ".config.results.json")),
-                        mode='w',
-                        encoding="utf-8",
-                        errors='strict') as f:
-                    f.write(serialize(config['agora_results_config']))
-    else:
-
-        try:
-            if args.format == "tsv-blocks":
+                    if config.get('agora_results_config', None) is not None:
+                        with open(
+                                os.path.join(args.output_path, str(election['id']) + ".config.results.json"),
+                                mode='w',
+                                encoding="utf-8",
+                                errors='strict') as f:
+                            f.write(serialize(config['agora_results_config']))
+            else:
                 blocks = csv_to_blocks(path=args.input_path, separator="\t")
                 election = blocks_to_election(blocks, config, args.add_to_id)
 
@@ -282,32 +280,32 @@ if __name__ == '__main__':
 
                 with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
                     f.write(serialize(election))
-            else:
-                if not os.path.exists(args.output_path):
-                    os.makedirs(args.output_path)
-                elif not os.path.isdir(args.output_path):
-                    print("output path must be a directory")
-                    exit(2)
+        else:
+            if not os.path.exists(args.output_path):
+                os.makedirs(args.output_path)
+            elif not os.path.isdir(args.output_path):
+                print("output path must be a directory")
+                exit(2)
 
-                elections = form_to_elections(path=args.input_path,
-                                              separator="\t",
-                                              config=config,
-                                              add_to_id=args.add_to_id)
-                for election in elections:
-                    fpath = os.path.join(args.output_path, "%d.census.json" % election["id"])
-                    with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
-                        f.write(serialize(election['census']))
-                    del election['census']
+            elections = form_to_elections(path=args.input_path,
+                                          separator="\t",
+                                          config=config,
+                                          add_to_id=args.add_to_id)
+            for election in elections:
+                fpath = os.path.join(args.output_path, "%d.census.json" % election["id"])
+                with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
+                    f.write(serialize(election['census']))
+                del election['census']
 
-                    fpath = os.path.join(args.output_path, "%d.json" % election["id"])
-                    with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
-                        f.write(serialize(election))
+                fpath = os.path.join(args.output_path, "%d.json" % election["id"])
+                with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
+                    f.write(serialize(election))
 
-                    fpath = os.path.join(args.output_path, "%d.config.json" % election["id"])
-                    with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
-                        f.write(serialize(config['authapi']['event_config']))
-        except:
-            print("malformed CSV")
-            import traceback
-            traceback.print_exc()
-            exit(3)
+                fpath = os.path.join(args.output_path, "%d.config.json" % election["id"])
+                with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
+                    f.write(serialize(config['authapi']['event_config']))
+    except:
+        print("malformed CSV")
+        import traceback
+        traceback.print_exc()
+        exit(3)

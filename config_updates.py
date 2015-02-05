@@ -729,8 +729,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-C',
         '--changes-path',
-        help='tsv file with the changes',
-        required=True)
+        help='tsv file with the changes')
 
     parser.add_argument(
         '-e',
@@ -776,23 +775,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if not os.access(args.changes_path, os.R_OK):
-        print("changes_path: can't read %s" % args.changes_path)
-        exit(2)
-    if not os.path.isfile(args.changes_path):
-        print("changes_path: not a file %s" % args.changes_path)
-        exit(2)
     if not os.access(args.config_path, os.R_OK):
         print("config_path: can't read %s" % args.config_path)
         exit(2)
     if not os.path.isfile(args.config_path):
         print("config_path: not a file %s" % args.config_path)
-        exit(2)
-    if not os.access(args.ids_path, os.R_OK):
-        print("ids_path: can't read %s" % args.ids_path)
-        exit(2)
-    if not os.path.isfile(args.ids_path):
-        print("ids_path: not a file %s" % args.ids_path)
         exit(2)
 
     config = None
