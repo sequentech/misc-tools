@@ -3,6 +3,7 @@
 import argparse
 import os
 import json
+import copy
 import requests
 from datetime import datetime
 from requests.auth import HTTPBasicAuth
@@ -213,6 +214,8 @@ if __name__ == "__main__":
             json_config = loadJson(os.path.join(args.create, config))
 
             # modify email title
+            json_config['auth_method'] = ADMIN_CONFIG['authapi']['event_config']['auth_method']
+            json_config['auth_method_config'] = copy.deepcopy(ADMIN_CONFIG['authapi']['event_config']['auth_method_config'])
             if "subject" in json_config['auth_method_config']:
                 json_config['auth_method_config']['subject'] = json_config['auth_method_config']['subject'] % dict(
                     title=json_ae['title'])
