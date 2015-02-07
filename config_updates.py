@@ -452,6 +452,14 @@ def post_process_results_config(
                     "withdrawed_candidates": withdrawls
                 }
             ])
+        elif config["agora_results_config_parity"]["method"] == "parity_zip_plurality_at_large":
+            cfg = config["agora_results_config_parity"]
+            results_config.append([
+                "agora_results.pipes.parity.parity_zip_plurality_at_large",
+                {
+                    "women_names": cfg['parity_list']
+                }
+            ])
 
 
 def apply_changes_hashing(
@@ -489,17 +497,23 @@ def parse_parity_config(config):
     '''
     if "agora_results_config_parity" in config:
         parity_list = []
-        path = config["agora_results_config_parity"]['sexes_tsv']
-        with open(path, mode='r', encoding="utf-8", errors='strict') as f:
-            for line in f:
-                line = line.strip()
-                election_id, sex, answer_text = line.split("\t")
-                parity_list.append(dict(
-                    election_id=int(election_id.strip()),
-                    is_woman=sex.strip() == 'M',
-                    answer_text=answer_text
-                ))
-            config["agora_results_config_parity"]['parity_list'] = parity_list
+        if config["agora_results_config_parity"]["method"] == "podemos_proportion_rounded_and_duplicates":
+            path = config["agora_results_config_parity"]['sexes_tsv']
+            with open(path, mode='r', encoding="utf-8", errors='strict') as f:
+                for line in f:
+                    line = line.strip()
+                    election_id, sex, answer_text = line.split("\t")
+                    parity_list.append(dict(
+                        election_id=int(election_id.strip()),
+                        is_woman=sex.strip() == 'M',
+                        answer_text=answer_text
+                    ))
+        else:
+            with open(path, mode='r', encoding="utf-8", errors='strict') as f:
+                for line in f:
+                    answer_text = line.strip()
+                    parity_list.append(answer_text)
+        config["agora_results_config_parity"]['parity_list'] = parity_list
 
 
 def write_agora_results_files(config, changes_path, elections_path, ids_path):
