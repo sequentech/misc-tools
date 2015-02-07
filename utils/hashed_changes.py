@@ -141,8 +141,8 @@ def add_candidate(change, election_config, **kwargs):
             new_candidature_id, len(answer_list_copy), election_id))
         return
 
-    if 'hash' in kwargs:
-        answ_hash = kwargs['hash']
+    if 'hash' in change:
+        answ_hash = change['hash']
     else:
         answ_hash = get_answer_hash(new_election_id, question_num, new_candidature_id, new_candidature_text)
 
