@@ -34,9 +34,9 @@ The format is very simple: A single table, with a list of columns describing som
 
 # Usage
 
-mkvirtualenv agora-tools -p $(which python3)
-workon agora-tools
-pip install -r requirements.txt
-config_updates.py -u updates.csv -c config.json --action check
-config_updates.py -u updates.csv -c config.json --action show_agora_elections_commands
-config_updates.py -u updates.csv -c config.json --action write_agora_results_files --dest-dir /tmp/agora-results-config
+    mkvirtualenv agora-tools -p $(which python3)
+    workon agora-tools
+    pip install -r requirements.txt
+    config_updates.py -u updates.csv -c config.json --action check
+    config_updates.py -u updates.csv -c config.json --action show_agora_elections_commands
+    config_updates.py -u updates.csv -c config.json --action write_agora_results_files --dest-dir /tmp/agora-results-config
