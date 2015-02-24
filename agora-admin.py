@@ -152,7 +152,6 @@ def electionCommand(aeid, command, method="POST", data=None):
         exit(1)
     return r
 
-
 if __name__ == "__main__":
 
     def check_positive_id(value):
@@ -224,12 +223,12 @@ if __name__ == "__main__":
 
             aeid = createAuthevent(json_config)
             print("Created auth-event with id ", aeid)
-            msg = addCensus(aeid, json_census)
-            print("Added census.")
+            if len(json_census) > 0:
+                msg = addCensus(aeid, json_census)
+                print("Added census.")
             getperm(obj_type="AuthEvent", perm="edit", obj_id=aeid)
             json_ae['id'] = aeid
             createElection(json_ae, aeid)
-
     elif args.start:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.start)
