@@ -93,9 +93,17 @@ def blocks_to_election(blocks, config, add_to_id=0):
               {
                   "id": int(answer["Id"]),
                   "category": answer.get("Category", ''),
-                  "details": "",
+                  "details": answer.get("Description", ''),
                   "sort_order": index,
-                  "urls": [],
+                  "urls": [
+                      {
+                        'title': url_key.strip(),
+                        'url': url_val.strip()
+                      }
+                      for url_key, url_val in answer.items()
+                      if url_key in ['Image URL', 'URL'] and\
+                          len(url_val.strip()) > 0
+                  ],
                   "text": answer['Text'],
               }
               for answer, index in zip(q['options'], range(len(q['options'])))
