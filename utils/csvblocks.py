@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import csv
+
 def csv_to_blocks(path, separator=",", strip_values=True):
     '''
     Converts a CSV file into a list of dictionaries provided that the CSV
@@ -81,11 +83,11 @@ def csv_to_blocks(path, separator=",", strip_values=True):
     headers = None
 
     with open(path, mode='r', encoding="utf-8", errors='strict') as f:
-        # main loop
-        for line in f:
+        fcsv = csv.reader(f, delimiter=separator, quotechar='"')
+        for orig_values in fcsv:
             # get values
             # to be safe, append some extra elements to the end of the list
-            values = line.split(separator) + ["" for _ in range(10)]
+            values = orig_values + ["" for _ in range(10)]
             if strip_values:
                 values = [val.strip() for val in values]
 
@@ -130,7 +132,7 @@ def csv_to_blocks(path, separator=",", strip_values=True):
                     if headers == None:
                         # as we addeed some extra empty elements to the values,
                         # we use here split again
-                        headers = line.split(separator)
+                        headers = orig_values
                     else:
                         current_block['values'].append(
                           dict((key.strip(), value)

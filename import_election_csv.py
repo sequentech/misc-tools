@@ -75,6 +75,16 @@ def blocks_to_election(blocks, config, add_to_id=0):
     election = blocks[0]['values']
     blocks.pop(0)
     questions = []
+
+    def get_answer_id(answer):
+        return answer['Id']
+
+    def get_description(answer):
+        return answer.get(
+          'Description',
+          (answer.get('Description 1', '') + "\n\n" + answer.get('Description 2', ''))
+            .replace('\n', "<br/>"))
+
     for question, options in zip(blocks[0::2], blocks[1::2]):
         q = question['values']
         q['options'] = options['values']
@@ -91,9 +101,9 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "answer_total_votes_percentage": q["Totals"],
             "answers": [
               {
-                  "id": int(answer["Id"]),
+                  "id": int(get_answer_id(answer)),
                   "category": answer.get("Category", ''),
-                  "details": answer.get("Description", ''),
+                  "details": get_description(answer),
                   "sort_order": index,
                   "urls": [
                       {
@@ -107,7 +117,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
                   "text": answer['Text'],
               }
               for answer, index in zip(q['options'], range(len(q['options'])))
-              if len("".join(answer.values())) > 0
+              if len("".join(answer.values()).strip()) > 0
             ]
         }
 
@@ -264,6 +274,7 @@ if __name__ == '__main__':
                 files = sorted([name for name in os.listdir(args.input_path)
                             if os.path.isfile(os.path.join(args.input_path, name))])
                 for name in files:
+                    print("importing %s" % name)
                     file_path = os.path.join(args.input_path, name)
                     blocks = csv_to_blocks(path=file_path, separator="\t")
                     election = blocks_to_election(blocks, config, args.add_to_id)

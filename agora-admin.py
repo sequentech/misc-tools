@@ -37,10 +37,7 @@ def login():
     global headers
     base_url = ADMIN_CONFIG['authapi']['url']
     event_id = ADMIN_CONFIG['authapi']['event-id']
-    credentials = {
-        "username": ADMIN_CONFIG['authapi']['username'],
-        "password": ADMIN_CONFIG['authapi']['password']
-    }
+    credentials = copy.deepcopy(ADMIN_CONFIG['authapi']['credentials'])
     req = request_post(base_url + 'auth-event/%d/authenticate/' % event_id,
         data=json.dumps(credentials))
     if req.status_code != 200:
