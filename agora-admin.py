@@ -6,10 +6,18 @@ import json
 import copy
 import requests
 from datetime import datetime
+from importlib import import_module
 from requests.auth import HTTPBasicAuth
 
 ADMIN_CONFIG = None
 KHMAC = None
+PLUGINS = []
+
+def load_plugins():
+    files = os.listdir(os.path.dirname(__file__))
+    for f in files:
+        if f.startswith('plugin_'):
+            PLUGINS.append(f.split('.')[0])
 
 def loadJson(filename):
     '''Load json file'''
@@ -29,6 +37,13 @@ def request_post(url, *args, **kwargs):
     print("POST %s" % url)
     kwargs['verify'] = False
     req = requests.post(url, *args, **kwargs)
+    print(req.status_code, req.text)
+    return req
+
+def request_delete(url, *args, **kwargs):
+    print("DELETE %s" % url)
+    kwargs['verify'] = False
+    req = requests.delete(url, *args, **kwargs)
     print(req.status_code, req.text)
     return req
 
@@ -150,6 +165,7 @@ def electionCommand(aeid, command, method="POST", data=None):
     return r
 
 if __name__ == "__main__":
+    load_plugins()
 
     def check_positive_id(value):
         ivalue = int(value)
@@ -181,6 +197,11 @@ if __name__ == "__main__":
             help="id authevent for sending auth codes")
     parser.add_argument("--subject", help="subject used for send-auth-codes")
     parser.add_argument("-m", "--msg", help="message used for send-auth-codes")
+
+    for plugin in PLUGINS:
+        mod = import_module(plugin)
+        for add_arg in mod.add_arguments:
+            parser.add_argument(add_arg[0], **add_arg[1])
 
     args = parser.parse_args()
 
@@ -280,4 +301,10 @@ if __name__ == "__main__":
         print("\n")
 
     else:
-        print(args)
+        for plugin in PLUGINS:
+            mod = import_module(plugin)
+            func = mod.check_arguments(args, globals(), locals())
+            if func:
+                break
+        if not func:
+            print(args)
