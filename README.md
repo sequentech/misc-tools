@@ -27,6 +27,11 @@ an election in both, then it allows that. But the admin/admin.py script from
 agora-elections still manages other agora-elections specific tasks like doing
 a tally, for example.
 
+## Plugin system
+
+The plugin system is simple, you need to create a file witch startwith **plugin_**, and added
+arguments and functions that execute this arguments. There is a example in plugin_plugin.py
+
 ## Usage
 
 For any of the actions, you need to provide the --config file (see
