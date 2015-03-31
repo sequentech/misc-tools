@@ -47,6 +47,9 @@ def edges2simpletree(edges):
         if child not in [None, '']:
           trees[parent][child] = trees[child]
 
+    if len(edges) == 0:
+        return {}
+
     parents, children = zip(*edges)
     roots = set(parents).difference(children)
 
