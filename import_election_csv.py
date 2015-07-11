@@ -37,7 +37,8 @@ BASE_ELECTION = {
         "share_text": "",
         "theme": 'default',
         "urls": [],
-        "theme_css": ""
+        "theme_css": "",
+        "extra_options": {}
     },
     "end_date": "",
     "start_date": "",
@@ -54,6 +55,7 @@ BASE_QUESTION = {
     "randomize_answer_order": True,
     "tally_type": "plurality-at-large",
     "answer_total_votes_percentage": "over-total-votes",
+    "extra_options": {},
     "answers": []
 }
 
@@ -80,10 +82,13 @@ def blocks_to_election(blocks, config, add_to_id=0):
         return answer['Id']
 
     def get_description(answer):
-        return answer.get(
-          'Description',
-          (answer.get('Description 1', '') + "\n\n" + answer.get('Description 2', ''))
-            .replace('\n', "<br/>"))
+        return answer.get('Description', '').replace('\n', '<br/>')
+
+    def get_url(key, value):
+        if key == 'Gender':
+            return "https://agoravoting.com/api/gender/%s" % value
+
+        return key + value.strip()
 
     for question, options in zip(blocks[0::2], blocks[1::2]):
         q = question['values']
@@ -99,6 +104,8 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "randomize_answer_order": q["Randomize options order"] == "TRUE",
             "tally_type": q.get("Voting system", "plurality-at-large"),
             "answer_total_votes_percentage": q["Totals"],
+            "extra_options": dict((key.replace("extra: ", ""),value)
+                for key, value in q.items() if key.startswith("extra: ")),
             "answers": [
               {
                   "id": int(get_answer_id(answer)),
@@ -107,11 +114,11 @@ def blocks_to_election(blocks, config, add_to_id=0):
                   "sort_order": index,
                   "urls": [
                       {
-                        'title': url_key.strip(),
-                        'url': url_val.strip()
+                        'title': url_key,
+                        'url': get_url(url_key, url_val)
                       }
                       for url_key, url_val in answer.items()
-                      if url_key in ['Image URL', 'URL'] and\
+                      if url_key in ['Image URL', 'URL', 'Gender'] and\
                           len(url_val.strip()) > 0
                   ],
                   "text": answer['Text'],
@@ -134,11 +141,18 @@ def blocks_to_election(blocks, config, add_to_id=0):
 
         questions.append(data)
 
+    def get_def(dictionary, key, default_value):
+        if key not in dictionary or len(dictionary[key]) == 0:
+            return default_value
 
-    try:
-        start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M:%S")
-    except:
-        start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M")
+        return dictionary[key]
+
+    start_date = datetime.strptime("10/10/2015 10:10", "%d/%m/%Y %H:%M")
+    if len(election["Start date time"]) > 0:
+        try:
+            start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M:%S")
+        except:
+            start_date = datetime.strptime(election["Start date time"], "%d/%m/%Y %H:%M")
 
     ret = {
         "id": int(election['Id']) + add_to_id,
@@ -151,9 +165,11 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "share_text": election.get('Share Text', ''),
             "theme": election.get('Theme', 'default'),
             "urls": [],
-            "theme_css": ""
+            "theme_css": "",
+            "extra_options": dict((key.replace("extra: ", ""),value)
+                for key, value in election.items() if key.startswith("extra: ")),
         },
-        "end_date": (start_date + timedelta(hours=int(election['Duration in hours']))).isoformat() + ".001",
+        "end_date": (start_date + timedelta(hours=int(get_def(election, 'Duration in hours', '24')))).isoformat() + ".001",
         "start_date": start_date.isoformat() + ".001",
         "questions": questions
     }
@@ -244,8 +260,8 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--add-to-id', type=int, help='add an int number to the id', default=0)
     parser.add_argument(
         '-f', '--format',
-        choices=['tsv-blocks', 'csv-google-forms'],
-        default="tsv-blocks",
+        choices=['csv-blocks', 'csv-google-forms'],
+        default="csv-blocks",
         help='output file or directory')
 
 
@@ -266,7 +282,7 @@ if __name__ == '__main__':
         config = json.loads(f.read())
 
     try:
-        if args.format == "tsv-blocks":
+        if args.format == "csv-blocks":
             if os.path.isdir(args.input_path):
                 if not os.path.exists(args.output_path):
                     os.makedirs(args.output_path)
@@ -276,7 +292,7 @@ if __name__ == '__main__':
                 for name in files:
                     print("importing %s" % name)
                     file_path = os.path.join(args.input_path, name)
-                    blocks = csv_to_blocks(path=file_path, separator="\t")
+                    blocks = csv_to_blocks(path=file_path, separator=",")
                     election = blocks_to_election(blocks, config, args.add_to_id)
                     output_path = os.path.join(args.output_path, str(election['id']) + ".config.json")
                     i += i + 1
@@ -294,8 +310,6 @@ if __name__ == '__main__':
             else:
                 blocks = csv_to_blocks(path=args.input_path, separator="\t")
                 election = blocks_to_election(blocks, config, args.add_to_id)
-
-                print(serialize(election))
 
                 with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
                     f.write(serialize(election))
