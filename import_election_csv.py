@@ -87,6 +87,8 @@ def blocks_to_election(blocks, config, add_to_id=0):
     def get_url(key, value):
         if key == 'Gender':
             return "https://agoravoting.com/api/gender/%s" % value
+        elif value.startswith('http://') or value.startswith('https://'):
+            return value.strip()
 
         return key + value.strip()
 
