@@ -165,7 +165,7 @@ def get_election_config(elections_path, election_id):
     '''
     election_path = os.path.join(elections_path, "%s.config.json" % election_id)
     with open(election_path, mode='r', encoding="utf-8", errors='strict') as f:
-        election_config = json.loads(json.loads(f.read())["payload"]['configuration'])
+        election_config = json.loads(f.read())["payload"]['configuration']
         return election_config
 
 def get_changes_func(func_name, module_path):
