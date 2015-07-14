@@ -89,6 +89,8 @@ def blocks_to_election(blocks, config, add_to_id=0):
             return "https://agoravoting.com/api/gender/%s" % value
         elif value.startswith('http://') or value.startswith('https://'):
             return value.strip()
+        elif key == 'Tag':
+            return "https://agoravoting.com/api/tag/%s" % value
 
         return key + value.strip()
 
@@ -120,7 +122,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
                         'url': get_url(url_key, url_val)
                       }
                       for url_key, url_val in answer.items()
-                      if url_key in ['Image URL', 'URL', 'Gender'] and\
+                      if url_key in ['Image URL', 'URL', 'Gender', 'Tag'] and\
                           len(url_val.strip()) > 0
                   ],
                   "text": answer['Text'],
