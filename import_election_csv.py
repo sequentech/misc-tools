@@ -264,7 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--add-to-id', type=int, help='add an int number to the id', default=0)
     parser.add_argument(
         '-f', '--format',
-        choices=['csv-blocks', 'csv-google-forms'],
+        choices=['csv-blocks', 'tsv-blocks', 'csv-google-forms'],
         default="csv-blocks",
         help='output file or directory')
 
@@ -286,7 +286,11 @@ if __name__ == '__main__':
         config = json.loads(f.read())
 
     try:
-        if args.format == "csv-blocks":
+        if args.format == "csv-blocks" or args.format == "tsv-blocks":
+            separator = {
+              "csv-blocks": ",",
+              "tsv-blocks": "\t"
+            }[args.format]
             if os.path.isdir(args.input_path):
                 if not os.path.exists(args.output_path):
                     os.makedirs(args.output_path)
@@ -296,7 +300,7 @@ if __name__ == '__main__':
                 for name in files:
                     print("importing %s" % name)
                     file_path = os.path.join(args.input_path, name)
-                    blocks = csv_to_blocks(path=file_path, separator=",")
+                    blocks = csv_to_blocks(path=file_path, separator=separator)
                     election = blocks_to_election(blocks, config, args.add_to_id)
                     output_path = os.path.join(args.output_path, str(election['id']) + ".config.json")
                     i += i + 1
@@ -312,7 +316,7 @@ if __name__ == '__main__':
                                 errors='strict') as f:
                             f.write(serialize(config['agora_results_config']))
             else:
-                blocks = csv_to_blocks(path=args.input_path, separator="\t")
+                blocks = csv_to_blocks(path=args.input_path, separator=separator)
                 election = blocks_to_election(blocks, config, args.add_to_id)
 
                 with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
