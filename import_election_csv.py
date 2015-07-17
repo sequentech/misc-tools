@@ -99,7 +99,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
         q['options'] = options['values']
 
         data = {
-            "description": q["Description"],
+            "description": q.get("Description", ''),
             "layout": q.get("Layout", 'simple'),
             "max": int(q["Maximum choices"]),
             "min": int(q["Minimum choices"]),
