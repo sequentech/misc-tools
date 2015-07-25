@@ -17,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
+from json import *
 
 def serialize(data):
     return json.dumps(data,

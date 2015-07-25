@@ -32,7 +32,7 @@ from datetime import datetime, timedelta
 from datadiff import diff
 
 from utils.csvblocks import csv_to_blocks
-from utils.json import serialize
+from utils.json_serialize import serialize
 from utils.tree import (edges2simpletree, list_edges, list_leaves, list_all,
                         get_list, get_ancestors)
 from utils.hashed_changes import hash_question

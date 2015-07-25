@@ -26,7 +26,7 @@ import argparse
 from datetime import datetime, timedelta
 
 from utils.csvblocks import csv_to_blocks
-from utils.json import serialize
+from utils.json_serialize import serialize
 
 BASE_ELECTION = {
     "id": -1,
