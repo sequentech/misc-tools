@@ -261,6 +261,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--config-path', help='default config for the election')
     parser.add_argument('-i', '--input-path', help='input file or directory')
     parser.add_argument('-o', '--output-path', help='output file or directory')
+    parser.add_argument('-A', '--admin-format', help='use create format for agora-admin instead of agora-elections', action="store_true")
     parser.add_argument('-a', '--add-to-id', type=int, help='add an int number to the id', default=0)
     parser.add_argument(
         '-f', '--format',
@@ -302,19 +303,36 @@ if __name__ == '__main__':
                     file_path = os.path.join(args.input_path, name)
                     blocks = csv_to_blocks(path=file_path, separator=separator)
                     election = blocks_to_election(blocks, config, args.add_to_id)
-                    output_path = os.path.join(args.output_path, str(election['id']) + ".config.json")
-                    i += i + 1
+
+                    if not args.admin_format:
+                        output_path = os.path.join(args.output_path, str(election['id']) + ".config.json")
+                    else:
+                        output_path = os.path.join(args.output_path, str(i) + ".json")
+                        auth_config_path = os.path.join(args.output_path, str(i) + ".config.json")
+                        auth_config = config['authapi']['event_config']
+                        with open(auth_config_path, mode='w', encoding="utf-8", errors='strict') as f:
+                            f.write(serialize(auth_config))
+
+                        auth_census_path = os.path.join(args.output_path, str(i) + ".census.json")
+                        with open(auth_census_path, mode='w', encoding="utf-8", errors='strict') as f:
+                            f.write("[]")
+
 
                     with open(output_path, mode='w', encoding="utf-8", errors='strict') as f:
                         f.write(serialize(election))
 
                     if config.get('agora_results_config', None) is not None:
+                        if not args.admin_format:
+                            results_conf_path = os.path.join(args.output_path, str(election['id']) + ".config.results.json")
+                        else:
+                            results_conf_path = os.path.join(args.output_path, str(i) + ".config.results.json")
                         with open(
-                                os.path.join(args.output_path, str(election['id']) + ".config.results.json"),
+                                results_conf_path,
                                 mode='w',
                                 encoding="utf-8",
                                 errors='strict') as f:
                             f.write(serialize(config['agora_results_config']))
+                    i += i + 1
             else:
                 blocks = csv_to_blocks(path=args.input_path, separator=separator)
                 election = blocks_to_election(blocks, config, args.add_to_id)
