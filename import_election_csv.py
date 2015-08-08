@@ -292,12 +292,17 @@ if __name__ == '__main__':
               "csv-blocks": ",",
               "tsv-blocks": "\t"
             }[args.format]
+            extension = {
+              "csv-blocks": ".csv",
+              "tsv-blocks": ".tsv"
+            }[args.format]
+
             if os.path.isdir(args.input_path):
                 if not os.path.exists(args.output_path):
                     os.makedirs(args.output_path)
                 i = 0
                 files = sorted([name for name in os.listdir(args.input_path)
-                            if os.path.isfile(os.path.join(args.input_path, name))])
+                            if os.path.isfile(os.path.join(args.input_path, name)) and name.endswith(extension)])
                 for name in files:
                     print("importing %s" % name)
                     file_path = os.path.join(args.input_path, name)
@@ -314,8 +319,9 @@ if __name__ == '__main__':
                             f.write(serialize(auth_config))
 
                         auth_census_path = os.path.join(args.output_path, str(i) + ".census.json")
+                        census_config = config['authapi'].get('census_data', [])
                         with open(auth_census_path, mode='w', encoding="utf-8", errors='strict') as f:
-                            f.write("[]")
+                            f.write(serialize(census_config))
 
 
                     with open(output_path, mode='w', encoding="utf-8", errors='strict') as f:

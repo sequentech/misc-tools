@@ -17,7 +17,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from json_serialize import serialize
+try:
+  from json_serialize import serialize
+except:
+  from utils.json_serialize import serialize
 import csv
 import argparse
 
