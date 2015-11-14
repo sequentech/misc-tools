@@ -19,11 +19,14 @@
 
 import json
 import os
+import re
 import sys
 import copy
 import operator
 import argparse
 import requests
+import unicodedata
+import string
 import traceback
 import subprocess
 import collections
@@ -197,6 +200,32 @@ def get_changes_chain_for_election_id(election_id, config, tree, node_changes):
         changes_chain = changes_chain + node_changes[ancestor_id]
     return changes_chain, ancestors
 
+def curate_config(election_config):
+  '''
+  remove the urls of all election questions' answers. Used when comparing two
+  elections when the urls are not relevant but might have changed.
+
+  Unifies also spacing. After all, spacing shouldn't be a problem when comparing
+  the meaning of strings.
+  '''
+  new_config = copy.deepcopy(election_config)
+  for question in new_config['questions']:
+    for answer in question['answers']:
+        answer['urls'] = []
+        answer['category'] = ''
+        answer['text'] = answer['text'].replace("&#34;", '"')
+        answer['text'] = answer['text'].replace("&#43;", '+')
+        answer['text'] = answer['text'].replace("&#64;", '@')
+        answer['text'] = answer['text'].replace("&#39;", "'")
+        answer['text'] = answer['text'].replace("\xa0", ' ')
+        answer['text'] = re.sub("[ \n\t]+", " ", answer['text'])
+        answer['text'] = remove_accents(answer['text'])
+
+  return new_config
+
+def remove_accents(data):
+    return ''.join(x for x in unicodedata.normalize('NFKD', data) if x in string.ascii_letters).lower()
+
 def apply_elections_changes(config, elections_path, ancestors, election_id,
     election_changes):
     '''
@@ -216,11 +245,14 @@ def apply_elections_changes(config, elections_path, ancestors, election_id,
     return election_config
 
 def check_diff_changes(elections_path, election_id, calculated_election_config):
-    election_config = get_election_config(elections_path, election_id)
-    if serialize(election_config) != serialize(calculated_election_config):
-        print("calculated election config differs for election %s. showing diff(config, calculated)" % election_id)
-        print(diff(election_config, calculated_election_config))
-        print(serialize(calculated_election_config))
+    curated_election_config = curate_config(calculated_election_config)
+    election_config = curate_config(get_election_config(
+      elections_path, election_id))
+    if serialize(election_config) != serialize(curated_election_config):
+        print("calculated election config differs for election %s. showing diff(config, calculated):\n\n" % election_id)
+        print(diff(election_config, curated_election_config))
+        print("\n\n\n</END_DIFF>")
+        print(serialize(curated_election_config))
 
 
 def check_changes(config, changes_path, elections_path, ids_path):
@@ -323,9 +355,6 @@ def find_question_mappings(hashed_election_configs, ancestors, dest_question, de
         questions = election_config['questions']
         for question, question_num in zip(questions, range(len(questions))):
             if question['hash'] == dest_question['hash']:
-                if question['title'] != dest_question['title']:
-                    print("WARNING: question mapping for different titles: (source, dest) = ('%s', '%s')" % (
-                        question['title'], dest_question['title']))
                 q_mappings.append({
                     'source_election_id': int(ancestor),
                     'source_question_num': question_num,
@@ -363,9 +392,6 @@ def find_answer_mappings(hashed_election_configs, ancestors, dest_answer, dest_q
         for question, question_num in zip(questions, range(len(questions))):
             for answer in question['answers']:
                 if answer['hash'] == dest_answer['hash']:
-                    if answer['text'] != dest_answer['text']:
-                        print("WARNING: answer mapping for different texts: (source, dest) = ('%s', '%s')" % (
-                            answer['text'], dest_answer['text']))
                     answer_mappings.append({
                         "source_election_id": int(ancestor),
                         "source_question_num": question_num,
