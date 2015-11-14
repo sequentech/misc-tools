@@ -131,7 +131,13 @@ def blocks_to_election(blocks, config, add_to_id=0):
         }
 
         # check answers
-        assert len(data['answers']) == len(set(map(operator.itemgetter('text'), data['answers'])))
+        try:
+          assert len(data['answers']) == len(set(list(map(operator.itemgetter('text'), data['answers']))))
+        except Exception as e:
+          print("duplicated options in question '%s':" % q["Title"])
+          l = list(map(operator.itemgetter('text'), data['answers']))
+          print(set([x for x in l if l.count(x) > 1]))
+          raise e
         data['max'] = min(data['max'], len(data['answers']))
         data['num_winners'] = min(data['num_winners'], len(data['answers']))
         for answ in data['answers']:

@@ -48,12 +48,6 @@ def remove_candidate(change, election_config, **kwargs):
             try:
                 assert answer['text'] == new_candidature_text
             except:
-                print("remove_candidate: candidate(%d) in question(%s) in election(%d) found with category = '%s' instead of '%s'" % (
-                    candidature_id, question['title'], election_id, answer['text'], new_candidature_text))
-                return
-            try:
-                assert answer['category'] == new_candidature_category
-            except:
                 print("remove_candidate: candidate(%d) in question(%s) in election(%d) found with text = '%s' instead of '%s'" % (
                     candidature_id, question['title'], election_id, answer['text'], new_candidature_text))
                 return
@@ -162,6 +156,16 @@ def add_question(change, election_config, **kwargs):
         "title": change['new_question_title'].strip()
     })
 
+def change_candidate(change, election_config, **kwargs):
+    '''
+    Used to change a candidate text
+    '''
+    question_num = int(change['question_number'].strip())
+    election_id = int(change['election_id'].strip())
+    cand_text = change['new_candidature_text']
+    cand_id = int(change['candidature_id'].strip())
+    answs = election_config['questions'][0]['answers'][-4:]
+    election_config['questions'][question_num]['answers'][cand_id]['text'] = cand_text
 
 def move_candidate(change, election_config, **kwargs):
     '''
