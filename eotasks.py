@@ -128,9 +128,8 @@ def print_task(task):
     print table
 
 # local parser
-parser = None
-def process_parser(self, class_parser):
-    parser = class_parser
+def process_parser(self, parser):
+    self.parser = parser
 
     parser.add_argument("--list", help="list last tasks",
                         action="store_true")
@@ -159,6 +158,7 @@ def process_parser(self, class_parser):
 from frestq.frestq_app import FrestqApp
 FrestqApp.process_parser = process_parser
 from frestq.app import *
+parser = app.parser
 pargs = app.pargs
 app.configure_app(config_object=__name__)
 
@@ -196,4 +196,4 @@ elif pargs.reject:
     target_pargs = parser.parse_args(["--finish", pargs.reject, '{"status": "denied"}'])
     finish_task(target_pargs)
 else:
-    parser.print_help()
+    app.run_args()
