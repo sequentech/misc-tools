@@ -155,7 +155,7 @@ def install(PEER_LIST, path, keystore=None):
         with open(temppem, "w") as f:
             f.write(el_json["ssl_certificate"])
             #keytool --delete mykey -keystore keystore.jks
-        subprocess.call("keytool -noprompt -import -file %s -keystore %s -storepass %s" % (temppem, keystore, CONFIG['KEYSTORE_PASS']), shell=True)
+        subprocess.call("keytool -noprompt -import -file %s -keystore %s -storepass '%s'" % (temppem, keystore, CONFIG['KEYSTORE_PASS']), shell=True)
         os.unlink(temppem)
 
 def uninstall(PEER_LIST, hostname, keystore=None):
@@ -205,7 +205,7 @@ def uninstall(PEER_LIST, hostname, keystore=None):
     if keystore:
         keystore = keystore[0]
         # removing the key from the keystore
-        subprocess.call("keytool -noprompt -delete -alias mykey -keystore %s -storepass %s" % (keystore, CONFIG['KEYSTORE_PASS']), shell=True)
+        subprocess.call("keytool -noprompt -delete -alias mykey -keystore %s -storepass '%s'" % (keystore, CONFIG['KEYSTORE_PASS']), shell=True)
 
 def showmine(pargs):
     '''
