@@ -528,7 +528,7 @@ def parse_parity_config(config):
             with open(path, mode='r', encoding="utf-8", errors='strict') as f:
                 for line in f:
                     line = line.strip()
-                    election_id, sex, answer_text = line.split("\t")
+                    election_id, answer_text, sex = line.split("\t")
                     parity_list.append(dict(
                         election_id=int(election_id.strip()),
                         is_woman=sex.strip() == 'M',
