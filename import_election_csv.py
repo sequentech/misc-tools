@@ -42,6 +42,7 @@ BASE_ELECTION = {
     },
     "end_date": "",
     "start_date": "",
+    "real": True,
     "questions": []
 }
 
@@ -179,7 +180,8 @@ def blocks_to_election(blocks, config, add_to_id=0):
         },
         "end_date": (start_date + timedelta(hours=int(get_def(election, 'Duration in hours', '24')))).isoformat() + ".001",
         "start_date": start_date.isoformat() + ".001",
-        "questions": questions
+        "questions": questions,
+        "real": True
     }
     return ret
 
