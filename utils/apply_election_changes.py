@@ -1,20 +1,19 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of agora-tools.
-# Copyright (C) 2014 Eduardo Robles Elvira <edulix AT agoravoting DOT com>
+# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
 
-# This program is free software: you can redistribute it and/or modify
+# agora-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
+# the Free Software Foundation, either version 3 of the License.
+
+# agora-tools  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
-#
+
 # You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 def change_question_max(change, election_config, **kwargs):
     '''
@@ -47,12 +46,6 @@ def remove_candidate(change, election_config, **kwargs):
             # check for safety
             try:
                 assert answer['text'] == new_candidature_text
-            except:
-                print("remove_candidate: candidate(%d) in question(%s) in election(%d) found with category = '%s' instead of '%s'" % (
-                    candidature_id, question['title'], election_id, answer['text'], new_candidature_text))
-                return
-            try:
-                assert answer['category'] == new_candidature_category
             except:
                 print("remove_candidate: candidate(%d) in question(%s) in election(%d) found with text = '%s' instead of '%s'" % (
                     candidature_id, question['title'], election_id, answer['text'], new_candidature_text))
@@ -162,6 +155,16 @@ def add_question(change, election_config, **kwargs):
         "title": change['new_question_title'].strip()
     })
 
+def change_candidate(change, election_config, **kwargs):
+    '''
+    Used to change a candidate text
+    '''
+    question_num = int(change['question_number'].strip())
+    election_id = int(change['election_id'].strip())
+    cand_text = change['new_candidature_text']
+    cand_id = int(change['candidature_id'].strip())
+    answs = election_config['questions'][0]['answers'][-4:]
+    election_config['questions'][question_num]['answers'][cand_id]['text'] = cand_text
 
 def move_candidate(change, election_config, **kwargs):
     '''

@@ -2,20 +2,19 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of agora-tools.
-# Copyright (C) 2014 Eduardo Robles Elvira <edulix AT agoravoting DOT com>
+# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
 
-# This program is free software: you can redistribute it and/or modify
+# agora-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
+# the Free Software Foundation, either version 3 of the License.
+
+# agora-tools  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
-#
+
 # You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
 import csv
@@ -42,6 +41,7 @@ BASE_ELECTION = {
     },
     "end_date": "",
     "start_date": "",
+    "real": True,
     "questions": []
 }
 
@@ -85,12 +85,10 @@ def blocks_to_election(blocks, config, add_to_id=0):
         return answer.get('Description', '').replace('\n', '<br/>')
 
     def get_url(key, value):
-        if key == 'Gender':
-            return "https://agoravoting.com/api/gender/%s" % value
+        if key in ['Gender', 'Tag', 'Support']:
+            return "https://agoravoting.com/api/%s/%s" % (key.lower(), value)
         elif value.startswith('http://') or value.startswith('https://'):
             return value.strip()
-        elif key == 'Tag':
-            return "https://agoravoting.com/api/tag/%s" % value
 
         return key + value.strip()
 
@@ -122,7 +120,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
                         'url': get_url(url_key, url_val)
                       }
                       for url_key, url_val in answer.items()
-                      if url_key in ['Image URL', 'URL', 'Gender', 'Tag'] and\
+                      if url_key in ['Image URL', 'URL', 'Gender', 'Tag', 'Support'] and\
                           len(url_val.strip()) > 0
                   ],
                   "text": answer['Text'],
@@ -133,7 +131,13 @@ def blocks_to_election(blocks, config, add_to_id=0):
         }
 
         # check answers
-        assert len(data['answers']) == len(set(map(operator.itemgetter('text'), data['answers'])))
+        try:
+          assert len(data['answers']) == len(set(list(map(operator.itemgetter('text'), data['answers']))))
+        except Exception as e:
+          print("duplicated options in question '%s':" % q["Title"])
+          l = list(map(operator.itemgetter('text'), data['answers']))
+          print(set([x for x in l if l.count(x) > 1]))
+          raise e
         data['max'] = min(data['max'], len(data['answers']))
         data['num_winners'] = min(data['num_winners'], len(data['answers']))
         for answ in data['answers']:
@@ -175,7 +179,8 @@ def blocks_to_election(blocks, config, add_to_id=0):
         },
         "end_date": (start_date + timedelta(hours=int(get_def(election, 'Duration in hours', '24')))).isoformat() + ".001",
         "start_date": start_date.isoformat() + ".001",
-        "questions": questions
+        "questions": questions,
+        "real": True
     }
     return ret
 
@@ -292,12 +297,17 @@ if __name__ == '__main__':
               "csv-blocks": ",",
               "tsv-blocks": "\t"
             }[args.format]
+            extension = {
+              "csv-blocks": ".csv",
+              "tsv-blocks": ".tsv"
+            }[args.format]
+
             if os.path.isdir(args.input_path):
                 if not os.path.exists(args.output_path):
                     os.makedirs(args.output_path)
                 i = 0
                 files = sorted([name for name in os.listdir(args.input_path)
-                            if os.path.isfile(os.path.join(args.input_path, name))])
+                            if os.path.isfile(os.path.join(args.input_path, name)) and name.endswith(extension)])
                 for name in files:
                     print("importing %s" % name)
                     file_path = os.path.join(args.input_path, name)
@@ -314,8 +324,9 @@ if __name__ == '__main__':
                             f.write(serialize(auth_config))
 
                         auth_census_path = os.path.join(args.output_path, str(i) + ".census.json")
+                        census_config = config['authapi'].get('census_data', [])
                         with open(auth_census_path, mode='w', encoding="utf-8", errors='strict') as f:
-                            f.write("[]")
+                            f.write(serialize(census_config))
 
 
                     with open(output_path, mode='w', encoding="utf-8", errors='strict') as f:

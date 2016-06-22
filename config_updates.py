@@ -2,28 +2,30 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of agora-tools.
-# Copyright (C) 2014 Eduardo Robles Elvira <edulix AT agoravoting DOT com>
+# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
 
-# This program is free software: you can redistribute it and/or modify
+# agora-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
+# the Free Software Foundation, either version 3 of the License.
+
+# agora-tools  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
-#
+
 # You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
 import os
+import re
 import sys
 import copy
 import operator
 import argparse
 import requests
+import unicodedata
+import string
 import traceback
 import subprocess
 import collections
@@ -197,6 +199,32 @@ def get_changes_chain_for_election_id(election_id, config, tree, node_changes):
         changes_chain = changes_chain + node_changes[ancestor_id]
     return changes_chain, ancestors
 
+def curate_config(election_config):
+  '''
+  remove the urls of all election questions' answers. Used when comparing two
+  elections when the urls are not relevant but might have changed.
+
+  Unifies also spacing. After all, spacing shouldn't be a problem when comparing
+  the meaning of strings.
+  '''
+  new_config = copy.deepcopy(election_config)
+  for question in new_config['questions']:
+    for answer in question['answers']:
+        answer['urls'] = []
+        answer['category'] = ''
+        answer['text'] = answer['text'].replace("&#34;", '"')
+        answer['text'] = answer['text'].replace("&#43;", '+')
+        answer['text'] = answer['text'].replace("&#64;", '@')
+        answer['text'] = answer['text'].replace("&#39;", "'")
+        answer['text'] = answer['text'].replace("\xa0", ' ')
+        answer['text'] = re.sub("[ \n\t]+", " ", answer['text'])
+        answer['text'] = remove_accents(answer['text'])
+
+  return new_config
+
+def remove_accents(data):
+    return ''.join(x for x in unicodedata.normalize('NFKD', data) if x in string.ascii_letters).lower()
+
 def apply_elections_changes(config, elections_path, ancestors, election_id,
     election_changes):
     '''
@@ -216,11 +244,14 @@ def apply_elections_changes(config, elections_path, ancestors, election_id,
     return election_config
 
 def check_diff_changes(elections_path, election_id, calculated_election_config):
-    election_config = get_election_config(elections_path, election_id)
-    if serialize(election_config) != serialize(calculated_election_config):
-        print("calculated election config differs for election %s. showing diff(config, calculated)" % election_id)
-        print(diff(election_config, calculated_election_config))
-        print(serialize(calculated_election_config))
+    curated_election_config = curate_config(calculated_election_config)
+    election_config = curate_config(get_election_config(
+      elections_path, election_id))
+    if serialize(election_config) != serialize(curated_election_config):
+        print("calculated election config differs for election %s. showing diff(config, calculated):\n\n" % election_id)
+        print(diff(election_config, curated_election_config))
+        print("\n\n\n</END_DIFF>")
+        print(serialize(curated_election_config))
 
 
 def check_changes(config, changes_path, elections_path, ids_path):
@@ -323,9 +354,6 @@ def find_question_mappings(hashed_election_configs, ancestors, dest_question, de
         questions = election_config['questions']
         for question, question_num in zip(questions, range(len(questions))):
             if question['hash'] == dest_question['hash']:
-                if question['title'] != dest_question['title']:
-                    print("WARNING: question mapping for different titles: (source, dest) = ('%s', '%s')" % (
-                        question['title'], dest_question['title']))
                 q_mappings.append({
                     'source_election_id': int(ancestor),
                     'source_question_num': question_num,
@@ -363,9 +391,6 @@ def find_answer_mappings(hashed_election_configs, ancestors, dest_answer, dest_q
         for question, question_num in zip(questions, range(len(questions))):
             for answer in question['answers']:
                 if answer['hash'] == dest_answer['hash']:
-                    if answer['text'] != dest_answer['text']:
-                        print("WARNING: answer mapping for different texts: (source, dest) = ('%s', '%s')" % (
-                            answer['text'], dest_answer['text']))
                     answer_mappings.append({
                         "source_election_id": int(ancestor),
                         "source_question_num": question_num,
@@ -502,7 +527,7 @@ def parse_parity_config(config):
             with open(path, mode='r', encoding="utf-8", errors='strict') as f:
                 for line in f:
                     line = line.strip()
-                    election_id, sex, answer_text = line.split("\t")
+                    election_id, answer_text, sex = line.split("\t")
                     parity_list.append(dict(
                         election_id=int(election_id.strip()),
                         is_woman=sex.strip() == 'M',
