@@ -73,8 +73,8 @@ def getTallyData(mypeerpkg):
     localServer = mypeerpkg["hostname"]
     return {
         # 'election_id': electionId,
-        "callback_url": "http://" + localServer + ":" + str(localPort) + "/receive_tally",
-        "votes_url": "http://" + localServer + ":" + str(localPort) + "/",
+        "callback_url": "https://" + localServer + ":" + str(localPort) + "/receive_tally",
+        "votes_url": "https://" + localServer + ":" + str(localPort) + "/",
         "votes_hash": "ni:///sha-256;"
     }
 
@@ -140,7 +140,7 @@ def grabAuthData(eopeers_dir, mypeerpkg, eopeers):
 def getStartData(eopeers_dir, mypeerpkg, eopeers):
     mypeerpkg = getPeerPkg(mypeerpkg)
     return {
-        "callback_url": "http://" + mypeerpkg["hostname"] + ":" + str(localPort) + "/key_done",
+        "callback_url": "https://" + mypeerpkg["hostname"] + ":" + str(localPort) + "/key_done",
         "title": "Test election",
         "description": "election description",
         'presentation': {},
@@ -255,8 +255,10 @@ def writeVotes(votesData, fileName):
 
 
 def startServer(port):
+    import ssl
     print("> Starting server on port " + str(port))
     server = ThreadingHTTPServer(('', port),RequestHandler)
+    server.socket = ssl.wrap_socket (server.socket, certfile=CERT, keyfile=KEY, server_side=True)
     thread = threading.Thread(target = server.serve_forever)
     thread.daemon = True
     thread.start()
