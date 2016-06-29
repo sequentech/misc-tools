@@ -49,6 +49,7 @@ PK_TIMEOUT = 60*10 # with three authorities 60 secons was not enough
 TALLY_TIMEOUT = 3600*6 # 6 hours should be enough for what we do :-P
 CERT = '/srv/certs/selfsigned/cert.pem'
 KEY = '/srv/certs/selfsigned/key-nopass.pem'
+CALIST = '/srv/certs/selfsigned/calist'
 DATA_DIR = "/srv/eotest/data"
 
 if not os.path.exists(DATA_DIR):
@@ -267,7 +268,7 @@ def startElection(electionId, url, data):
     data['id'] = int(electionId)
     print("> Creating election %s" % electionId)
     cv.done = False
-    r = requests.post(url, data=json.dumps(data), verify=False, cert=(CERT, KEY))
+    r = requests.post(url, data=json.dumps(data), verify=CALIST, cert=(CERT, KEY))
     print("> " + str(r))
 
 def waitForPublicKey():
@@ -297,7 +298,7 @@ def doTally(electionId, url, data, votesFile, hash):
     # print("> Tally post with " + json.dumps(data))
     print("> Requesting tally..")
     cv.done = False
-    r = requests.post(url, data=json.dumps(data), verify=False, cert=(CERT, KEY))
+    r = requests.post(url, data=json.dumps(data), verify=CALIST, cert=(CERT, KEY))
     print("> " + str(r))
     if r.status_code == 400:
         print("> error:" + str(r.text))
