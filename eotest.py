@@ -16,6 +16,8 @@
 # along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 import requests
+import ssl
+from requests.adapters import HTTPAdapter
 import json
 import time
 import random
@@ -60,6 +62,10 @@ os.chdir(DATA_DIR)
 # configuration
 localPort = 8000
 node = '/usr/bin/node'
+
+class RejectAdapter(HTTPAdapter):
+    def send(self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None):
+        raise Exception('Policy set to reject connection to ' + request.url)
 
 def getPeerPkg(mypeerpkg):
     if mypeerpkg is None:
@@ -265,10 +271,12 @@ def startServer(port):
     thread.start()
 
 def startElection(electionId, url, data):
+    session = requests.sessions.Session()
+    session.mount('http://', RejectAdapter())
     data['id'] = int(electionId)
     print("> Creating election %s" % electionId)
     cv.done = False
-    r = requests.post(url, data=json.dumps(data), verify=CALIST, cert=(CERT, KEY))
+    r = session.request('post', url, data=json.dumps(data), verify=CALIST, cert=(CERT, KEY))
     print("> " + str(r))
 
 def waitForPublicKey():
@@ -292,13 +300,15 @@ def waitForPublicKey():
     return pk
 
 def doTally(electionId, url, data, votesFile, hash):
+    session = requests.sessions.Session()
+    session.mount('http://', RejectAdapter())
     data['votes_url'] = data['votes_url'] + votesFile
     data['votes_hash'] = data['votes_hash'] + hash
     data['election_id'] = int(electionId)
     # print("> Tally post with " + json.dumps(data))
     print("> Requesting tally..")
     cv.done = False
-    r = requests.post(url, data=json.dumps(data), verify=CALIST, cert=(CERT, KEY))
+    r = session.request('post', url, data=json.dumps(data), verify=CALIST, cert=(CERT, KEY))
     print("> " + str(r))
     if r.status_code == 400:
         print("> error:" + str(r.text))
@@ -321,11 +331,13 @@ def waitForTally():
     return ret
 
 def downloadTally(url, electionId):
+    session = requests.sessions.Session()
+    session.mount('http://', RejectAdapter())
     fileName = electionId + '.tar.gz'
     path = os.path.join(DATA_DIR, fileName)
     print("> Downloading to %s" % path)
     with open(path, 'wb') as handle:
-        request = requests.get(url, stream=True, verify=False, cert=(CERT, KEY))
+        request = session.request('get',url, stream=True, verify=False, cert=(CERT, KEY))
 
         for block in request.iter_content(1024):
             if not block:
