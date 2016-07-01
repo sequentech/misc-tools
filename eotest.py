@@ -16,6 +16,8 @@
 # along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 import requests
+import ssl
+from requests.adapters import HTTPAdapter
 import json
 import time
 import random
@@ -49,6 +51,7 @@ PK_TIMEOUT = 60*10 # with three authorities 60 secons was not enough
 TALLY_TIMEOUT = 3600*6 # 6 hours should be enough for what we do :-P
 CERT = '/srv/certs/selfsigned/cert.pem'
 KEY = '/srv/certs/selfsigned/key-nopass.pem'
+CALIST = '/srv/certs/selfsigned/calist'
 DATA_DIR = "/srv/eotest/data"
 
 if not os.path.exists(DATA_DIR):
@@ -59,6 +62,10 @@ os.chdir(DATA_DIR)
 # configuration
 localPort = 8000
 node = '/usr/bin/node'
+
+class RejectAdapter(HTTPAdapter):
+    def send(self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None):
+        raise Exception('Policy set to reject connection to ' + request.url)
 
 def getPeerPkg(mypeerpkg):
     if mypeerpkg is None:
@@ -73,8 +80,8 @@ def getTallyData(mypeerpkg):
     localServer = mypeerpkg["hostname"]
     return {
         # 'election_id': electionId,
-        "callback_url": "http://" + localServer + ":" + str(localPort) + "/receive_tally",
-        "votes_url": "http://" + localServer + ":" + str(localPort) + "/",
+        "callback_url": "https://" + localServer + ":" + str(localPort) + "/receive_tally",
+        "votes_url": "https://" + localServer + ":" + str(localPort) + "/",
         "votes_hash": "ni:///sha-256;"
     }
 
@@ -140,7 +147,7 @@ def grabAuthData(eopeers_dir, mypeerpkg, eopeers):
 def getStartData(eopeers_dir, mypeerpkg, eopeers):
     mypeerpkg = getPeerPkg(mypeerpkg)
     return {
-        "callback_url": "http://" + mypeerpkg["hostname"] + ":" + str(localPort) + "/key_done",
+        "callback_url": "https://" + mypeerpkg["hostname"] + ":" + str(localPort) + "/key_done",
         "title": "Test election",
         "description": "election description",
         'presentation': {},
@@ -255,17 +262,21 @@ def writeVotes(votesData, fileName):
 
 
 def startServer(port):
+    import ssl
     print("> Starting server on port " + str(port))
     server = ThreadingHTTPServer(('', port),RequestHandler)
+    server.socket = ssl.wrap_socket (server.socket, certfile=CERT, keyfile=KEY, server_side=True)
     thread = threading.Thread(target = server.serve_forever)
     thread.daemon = True
     thread.start()
 
 def startElection(electionId, url, data):
+    session = requests.sessions.Session()
+    session.mount('http://', RejectAdapter())
     data['id'] = int(electionId)
     print("> Creating election %s" % electionId)
     cv.done = False
-    r = requests.post(url, data=json.dumps(data), verify=False, cert=(CERT, KEY))
+    r = session.request('post', url, data=json.dumps(data), verify=CALIST, cert=(CERT, KEY))
     print("> " + str(r))
 
 def waitForPublicKey():
@@ -289,13 +300,15 @@ def waitForPublicKey():
     return pk
 
 def doTally(electionId, url, data, votesFile, hash):
+    session = requests.sessions.Session()
+    session.mount('http://', RejectAdapter())
     data['votes_url'] = data['votes_url'] + votesFile
     data['votes_hash'] = data['votes_hash'] + hash
     data['election_id'] = int(electionId)
     # print("> Tally post with " + json.dumps(data))
     print("> Requesting tally..")
     cv.done = False
-    r = requests.post(url, data=json.dumps(data), verify=False, cert=(CERT, KEY))
+    r = session.request('post', url, data=json.dumps(data), verify=CALIST, cert=(CERT, KEY))
     print("> " + str(r))
     if r.status_code == 400:
         print("> error:" + str(r.text))
@@ -318,11 +331,13 @@ def waitForTally():
     return ret
 
 def downloadTally(url, electionId):
+    session = requests.sessions.Session()
+    session.mount('http://', RejectAdapter())
     fileName = electionId + '.tar.gz'
     path = os.path.join(DATA_DIR, fileName)
     print("> Downloading to %s" % path)
     with open(path, 'wb') as handle:
-        request = requests.get(url, stream=True, verify=False, cert=(CERT, KEY))
+        request = session.request('get',url, stream=True, verify=False, cert=(CERT, KEY))
 
         for block in request.iter_content(1024):
             if not block:
