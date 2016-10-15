@@ -33,7 +33,18 @@ BASE_ELECTION = {
     "description": "",
     "layout": "",
     "presentation": {
-        "share_text": "",
+        "share_text": [
+        {
+          "network": "Twitter",
+          "button_text": "",
+          "social_message": "I have just voted in election __URL__, you can too! #nvotes"
+        },
+        {
+          "network": "Facebook",
+          "button_text": "",
+          "social_message": "__URL__"
+        }
+      ],
         "theme": 'default',
         "urls": [],
         "theme_css": "",
@@ -170,7 +181,18 @@ def blocks_to_election(blocks, config, add_to_id=0):
         "description": election['Description'],
         "layout": election.get('Layout', ''),
         "presentation": {
-            "share_text": election.get('Share Text', ''),
+            "share_text": [
+              {
+                "network": "Twitter",
+                "button_text": "",
+                "social_message": election.get('Share Text', '')
+              },
+              {
+                "network": "Facebook",
+                "button_text": "",
+                "social_message": "__URL__"
+              }
+            ],
             "theme": election.get('Theme', 'default'),
             "urls": [],
             "theme_css": "",
