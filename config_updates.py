@@ -41,7 +41,7 @@ from utils.tree import (edges2simpletree, list_edges, list_leaves, list_all,
 from utils.hashed_changes import hash_question
 from utils.deterministic_tar import deterministic_tar_open, deterministic_tar_add
 
-from shutil import copyfile2
+from shutil import copy2
 
 def get_changes_tree(changes):
     '''
@@ -703,7 +703,7 @@ def calculate_results(config, tree_path, elections_path, check):
 def verify_results(config, tree_path, elections_path, tallies_path):
     # verifies the results
     # tallies_path must exist
-    if not os.path.isdir(tallies_path)
+    if not os.path.isdir(tallies_path):
         print("%s path doesn't exist or is not a folder" % tallies_path)
 
     cfg_res_postfix = '.config.results.json'
@@ -717,7 +717,7 @@ def verify_results(config, tree_path, elections_path, tallies_path):
     ids_w_res = [
         int(f)
         for f in ids_w_res_config
-        if os.path.isfile(os.path.join(elections_path, f + res_postfix))]
+        if os.path.isfile(os.path.join(elections_path, str(f) + res_postfix))]
 
     if len(ids_w_res) != len(ids_w_res_config):
         ids_not_included = [
@@ -728,17 +728,17 @@ def verify_results(config, tree_path, elections_path, tallies_path):
 
     # copy config files to output folder
     for eid in ids_w_res:
-        copy2(os.path.join(elections_path, eid + cfg_res_postfix), os.path.join(tallies_path, eid + cfg_res_postfix))
+        copy2(os.path.join(elections_path, str(eid) + cfg_res_postfix), os.path.join(tallies_path, str(eid) + cfg_res_postfix))
 
     calculate_results(config, tree_path, tallies_path, check=False)
 
     for eid in ids_w_res:
-        if not os.path.isfile(os.path.join(tallies_path, eid + res_postfix)):
+        if not os.path.isfile(os.path.join(tallies_path, str(eid) + res_postfix)):
             print("election %s results are missing, passing" % eid)
             continue
 
-        hash1 = hash_file(os.path.join(elections_path, eid + res_postfix))
-        hash2 = hash_file(os.path.join(tallies_path, eid + res_postfix))
+        hash1 = hash_file(os.path.join(elections_path, str(eid) + res_postfix))
+        hash2 = hash_file(os.path.join(tallies_path, str(eid) + res_postfix))
         if hash1 == hash2:
             print("%s election VERIFIED" % eid)
         else:
