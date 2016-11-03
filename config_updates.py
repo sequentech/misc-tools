@@ -28,6 +28,7 @@ import unicodedata
 import string
 import traceback
 import subprocess
+import hashlib
 import collections
 from datetime import datetime, timedelta
 
@@ -39,6 +40,8 @@ from utils.tree import (edges2simpletree, list_edges, list_leaves, list_all,
                         get_list, get_ancestors)
 from utils.hashed_changes import hash_question
 from utils.deterministic_tar import deterministic_tar_open, deterministic_tar_add
+
+from shutil import copyfile2
 
 def get_changes_tree(changes):
     '''
@@ -621,6 +624,20 @@ def write_agora_results_files(config, changes_path, elections_path, ids_path):
         with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
             f.write(serialize(results_config))
 
+def hash_file(filePath):
+    '''
+    Returns the hexdigest of the hash of the contents of a file, given the file
+    path.
+    '''
+    BUF_SIZE = 10*1024
+    hasha = hashlib.sha512()
+    with open(filePath, 'r', encoding='utf-8') as f:
+        for chunk in f.read(BUF_SIZE):
+            hasha.update(chunk.encode('utf-8'))
+        f.close()
+
+    return hasha.hexdigest()
+
 def calculate_results(config, tree_path, elections_path, check):
     '''
     Launches agora-results for those elections that do have a tally
@@ -682,6 +699,50 @@ def calculate_results(config, tree_path, elections_path, check):
             create_results(last_id, cfg_res_postfix, elections_path, bin_path, "tsv")
             create_results(last_id, cfg_res_postfix, elections_path, bin_path, "pretty")
         print()
+
+def verify_results(config, tree_path, elections_path, tallies_path):
+    # verifies the results
+    # tallies_path must exist
+    if not os.path.isdir(tallies_path)
+        print("%s path doesn't exist or is not a folder" % tallies_path)
+
+    cfg_res_postfix = '.config.results.json'
+    # list of elections
+    ids_w_res_config = [
+        int(f.replace(cfg_res_postfix, ''))
+        for f in os.listdir(elections_path)
+        if os.path.isfile(os.path.join(elections_path, f)) and f.endswith(cfg_res_postfix)]
+
+    res_postfix = '.results.json'
+    ids_w_res = [
+        int(f)
+        for f in ids_w_res_config
+        if os.path.isfile(os.path.join(elections_path, f + res_postfix))]
+
+    if len(ids_w_res) != len(ids_w_res_config):
+        ids_not_included = [
+            item
+            for item in ids_w_res_config
+            if item not in ids_w_res]
+        print("the following eids don't have a result to verify: %s" % ids_not_included)
+
+    # copy config files to output folder
+    for eid in ids_w_res:
+        copy2(os.path.join(elections_path, eid + cfg_res_postfix), os.path.join(tallies_path, eid + cfg_res_postfix))
+
+    calculate_results(config, tree_path, tallies_path, check=False)
+
+    for eid in ids_w_res:
+        if not os.path.isfile(os.path.join(tallies_path, eid + res_postfix)):
+            print("election %s results are missing, passing" % eid)
+            continue
+
+        hash1 = hash_file(os.path.join(elections_path, eid + res_postfix))
+        hash2 = hash_file(os.path.join(tallies_path, eid + res_postfix))
+        if hash1 == hash2:
+            print("%s election VERIFIED" % eid)
+        else:
+            print("%s election FAILED verification" % eid)
 
 def count_votes(config, tree_path):
     '''
@@ -807,6 +868,7 @@ if __name__ == '__main__':
             'check_changes',
             'write_agora_results_files',
             'calculate_results',
+            'verify_results',
             'check_results',
             'count_votes',
             'tar_tallies'],
@@ -853,6 +915,8 @@ if __name__ == '__main__':
         check_changes(config, args.changes_path, args.elections_path, args.ids_path)
     elif args.action == 'calculate_results':
         calculate_results(config, args.tree_path, args.elections_path, check=False)
+    elif args.action == 'verify_results':
+        verify_results(config, args.tree_path, args.elections_path, args.tallies_path)
     elif args.action == 'check_results':
         calculate_results(config, args.tree_path, args.elections_path, check=True)
     elif args.action == 'tar_tallies':
