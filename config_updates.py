@@ -803,8 +803,8 @@ def zip_tallies(config, tree_path, elections_path, tallies_path, password):
             continue
         # create zip
         zip_path = os.path.join(tallies_path, "%d.zip" % last_id)
-        print("creating %s .." % z_path)
-        pyminizip.compress_multiple(zip_path, zip_path, password, 9)
+        print("creating %s .." % zip_path)
+        pyminizip.compress_multiple(paths, zip_path, password, 9)
 
 def tar_tallies(config, tree_path, elections_path, tallies_path):
     '''
@@ -966,4 +966,4 @@ if __name__ == '__main__':
         elections_path_check(os.W_OK)
         write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
     elif 'zip_tallies' == args.action:
-        zip_tallies(config, tree_path, args.elections_path, args.tallies_path, args.password)
+        zip_tallies(config, args.tree_path, args.elections_path, args.tallies_path, args.password)
