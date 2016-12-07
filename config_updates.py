@@ -42,6 +42,7 @@ from utils.hashed_changes import hash_question
 from utils.deterministic_tar import deterministic_tar_open, deterministic_tar_add
 
 from shutil import copy2
+import pyminizip
 
 def get_changes_tree(changes):
     '''
@@ -773,6 +774,38 @@ def count_votes(config, tree_path):
         print("%s = %s" % (json.dumps(eids), json.dumps(n_votes)))
     print("total votes: %d" % total_votes)
 
+def zip_tallies(config, tree_path, elections_path, tallies_path, password):
+    with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
+        tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
+
+    if password is None:
+        return
+    def can_read_file(f):
+      return os.access(f, os.R_OK) and os.path.isfile(f)
+
+    def check_files(paths, eids):
+        for path in paths:
+            if not can_read_file(path):
+                print("eids = %s, has no %s, passing" % (
+                    json.dumps(eids), path))
+                return False
+        return True
+
+    for eids in tree:
+        last_id = eids[-1]
+        paths = [
+            os.path.join(elections_path, "%d.results.json" % last_id),
+            os.path.join(elections_path, "%d.results.pretty" % last_id),
+            os.path.join(elections_path, "%d.results.tsv" % last_id)
+        ]
+
+        if not check_files(paths, eids):
+            continue
+        # create zip
+        zip_path = os.path.join(tallies_path, "%d.zip" % last_id)
+        print("creating %s .." % z_path)
+        pyminizip.compress_multiple(zip_path, zip_path, password, 9)
+
 def tar_tallies(config, tree_path, elections_path, tallies_path):
     '''
     Tars the tallies conveniently
@@ -846,6 +879,11 @@ if __name__ == '__main__':
         '--ids-path',
         help='path to the file with all the election ids, one per line',
         default=None)
+    parser.add_argument(
+        '-p',
+        '--password',
+        help='password for the zip file',
+        default=None)
 
     parser.add_argument(
         '-T',
@@ -871,7 +909,8 @@ if __name__ == '__main__':
             'verify_results',
             'check_results',
             'count_votes',
-            'tar_tallies'],
+            'tar_tallies',
+            'zip_tallies'],
         required=True)
 
     args = parser.parse_args()
@@ -926,3 +965,5 @@ if __name__ == '__main__':
     elif args.action == 'write_agora_results_files':
         elections_path_check(os.W_OK)
         write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
+    elif 'zip_tallies' == args.action:
+        zip_tallies(config, tree_path, args.elections_path, args.tallies_path, args.password)
