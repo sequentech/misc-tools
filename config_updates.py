@@ -680,7 +680,7 @@ def calculate_results(config, tree_path, elections_path, check):
             headers = {'content-type': 'application/json'}
             base_url = config['agora_elections_base_url']
 
-            url = '%s/election/%s' % (base_url, election_id.strip())
+            url = '%s/election/%d' % (base_url, election_id)
             r = requests.get(url, headers=headers)
 
             if r.status_code != 200:
@@ -693,9 +693,8 @@ def calculate_results(config, tree_path, elections_path, check):
 
         def create_pdf(election_id, cfg_res_postfix, elections_path, bin_path, oformat, only_check=False):
             save_election_cfg(election_id, elections_path)
-            cmd = "%s -e %s-t %s -c %s -s -o %s -eid %d" % (
+            cmd = "%s -t %s -c %s -s -o %s -eid %d" % (
                 bin_path,
-                elections_path,
                 " ".join(tallies),
                 os.path.join(elections_path, str(election_id) + cfg_res_postfix),
                 'pdf',
@@ -705,7 +704,7 @@ def calculate_results(config, tree_path, elections_path, check):
                 cmd = cmd.replace("-s ", "")
                 return
             # f_path = os.path.join(elections_path, str(last_id) + ".results.pdf" + oformat)
-            subprocess.check_call(cmd, stdout=f, stderr=sys.stderr, shell=True)
+            subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
 
         # got the tallies, the config file --> calculate results
         def create_results(last_id, cfg_res_postfix, elections_path, bin_path, oformat, only_check=False):
