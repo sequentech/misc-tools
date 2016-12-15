@@ -639,6 +639,55 @@ def hash_file(filePath):
 
     return hasha.hexdigest()
 
+def save_election_cfg(election_id, elections_path):
+    headers = {'content-type': 'application/json'}
+    base_url = config['agora_elections_base_url']
+
+    url = '%s/election/%d' % (base_url, election_id)
+    r = requests.get(url, headers=headers)
+
+    if r.status_code != 200:
+        print(r.status_code, r.text)
+        raise Exception('Invalid status code: %d for election_id = %s' % (r.status_code, election_id))
+
+    epath = os.path.join(elections_path, "%s.config.json" % election_id)
+    with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
+        f.write(r.text)
+
+def create_pdf(election_id, cfg_res_postfix, elections_path, bin_path, oformat, only_check=False):
+    save_election_cfg(election_id, elections_path)
+    cmd = "%s -t %s -c %s -o %s -eid %d" % (
+        bin_path,
+        " ".join(tallies),
+        os.path.join(elections_path, str(election_id) + cfg_res_postfix),
+        'pdf',
+        election_id)
+    if only_check:
+        print(cmd)
+        cmd = cmd.replace("-s ", "")
+        return
+    # f_path = os.path.join(elections_path, str(last_id) + ".results.pdf" + oformat)
+    subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+
+def generate_pdf(config, tree_path, elections_path):
+    '''
+    Launches agora-results to generate a pdf for those elections that do 
+    have a tally
+    '''
+    with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
+        tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
+
+    priv_path = config["agora_elections_private_datastore_path"]
+    bin_path = config['agora_results_bin_path']
+    cfg_res_postfix = '.config.results.json'
+
+    for eids in tree:
+        # check for config file
+        last_id = eids[-1]
+
+        print("eids = %s: creating pdf.. " % json.dumps(eids), end="")
+        create_pdf(last_id, cfg_res_postfix, elections_path, bin_path, "pdf")
+
 def calculate_results(config, tree_path, elections_path, check):
     '''
     Launches agora-results for those elections that do have a tally
@@ -675,36 +724,6 @@ def calculate_results(config, tree_path, elections_path, check):
             continue
 
         print("eids = %s: calculating results.. " % json.dumps(eids), end="")
-
-        def save_election_cfg(election_id, elections_path):
-            headers = {'content-type': 'application/json'}
-            base_url = config['agora_elections_base_url']
-
-            url = '%s/election/%d' % (base_url, election_id)
-            r = requests.get(url, headers=headers)
-
-            if r.status_code != 200:
-                print(r.status_code, r.text)
-                raise Exception('Invalid status code: %d for election_id = %s' % (r.status_code, election_id))
-
-            epath = os.path.join(elections_path, "%s.config.json" % election_id)
-            with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
-                f.write(r.text)
-
-        def create_pdf(election_id, cfg_res_postfix, elections_path, bin_path, oformat, only_check=False):
-            save_election_cfg(election_id, elections_path)
-            cmd = "%s -t %s -c %s -s -o %s -eid %d" % (
-                bin_path,
-                " ".join(tallies),
-                os.path.join(elections_path, str(election_id) + cfg_res_postfix),
-                'pdf',
-                election_id)
-            if only_check:
-                print(cmd)
-                cmd = cmd.replace("-s ", "")
-                return
-            # f_path = os.path.join(elections_path, str(last_id) + ".results.pdf" + oformat)
-            subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
 
         # got the tallies, the config file --> calculate results
         def create_results(last_id, cfg_res_postfix, elections_path, bin_path, oformat, only_check=False):
@@ -942,7 +961,8 @@ if __name__ == '__main__':
             'check_results',
             'count_votes',
             'tar_tallies',
-            'zip_tallies'],
+            'zip_tallies',
+            'generate_pdf'],
         required=True)
 
     args = parser.parse_args()
@@ -999,3 +1019,5 @@ if __name__ == '__main__':
         write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
     elif 'zip_tallies' == args.action:
         zip_tallies(config, args.tree_path, args.elections_path, args.tallies_path, args.password)
+    elif 'generate_pdf' == args.action:
+        generate_pdf(config, args.tree_path, args.elections_path)
