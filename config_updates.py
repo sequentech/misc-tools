@@ -639,6 +639,51 @@ def hash_file(filePath):
 
     return hasha.hexdigest()
 
+def create_pdf(election_id, cfg_res_postfix, elections_path, bin_path, oformat, tallies, only_check=False):
+    cmd = "%s -t %s -c %s -o %s -eid %d" % (
+        bin_path,
+        " ".join(tallies),
+        os.path.join(elections_path, str(election_id) + cfg_res_postfix),
+        'pdf',
+        election_id)
+
+    print(cmd)
+    if only_check:
+        return
+    # f_path = os.path.join(elections_path, str(last_id) + ".results.pdf" + oformat)
+    subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+
+def generate_pdf(config, tree_path, elections_path):
+    '''
+    Launches agora-results to generate a pdf for those elections that do 
+    have a tally
+    '''
+    with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
+        tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
+
+    priv_path = config["agora_elections_private_datastore_path"]
+    bin_path = config['agora_results_bin_path']
+    cfg_res_postfix = '.config.results.json'
+
+    for eids in tree:
+        # check for config file
+        last_id = eids[-1]
+
+        # check for tallies
+        tallies = []
+        for eid in eids:
+            tally_path = os.path.join(priv_path, str(eid), 'tally.tar.gz')
+            ids_path = os.path.join(priv_path, str(eid), 'ids')
+            if not os.path.isfile(ids_path):
+                print("eids = %s, eid %d has not even ids, passing" % (json.dumps(eids), eid))
+            if not os.path.isfile(tally_path):
+                print("eids = %s, eid %d has no tally (yet?), passing" % (json.dumps(eids), eid))
+                break
+            tallies.append(tally_path)
+
+        print("eids = %s: creating pdf.. " % json.dumps(eids), end="")
+        create_pdf(last_id, cfg_res_postfix, elections_path, bin_path, "pdf", tallies)
+
 def calculate_results(config, tree_path, elections_path, check):
     '''
     Launches agora-results for those elections that do have a tally
@@ -692,11 +737,13 @@ def calculate_results(config, tree_path, elections_path, check):
                 return
             f_path = os.path.join(elections_path, str(last_id) + ".results." + oformat)
             with open(f_path, mode='w', encoding="utf-8", errors='strict') as f:
+                print(cmd)
                 subprocess.check_call(cmd, stdout=f, stderr=sys.stderr, shell=True)
 
         bin_path = config['agora_results_bin_path']
         create_results(last_id, cfg_res_postfix, elections_path, bin_path, "json", only_check=check)
         if not check:
+            create_pdf(last_id, cfg_res_postfix, elections_path, bin_path, "pdf", tallies)
             create_results(last_id, cfg_res_postfix, elections_path, bin_path, "tsv")
             create_results(last_id, cfg_res_postfix, elections_path, bin_path, "pretty")
         print()
@@ -910,7 +957,8 @@ if __name__ == '__main__':
             'check_results',
             'count_votes',
             'tar_tallies',
-            'zip_tallies'],
+            'zip_tallies',
+            'generate_pdf'],
         required=True)
 
     args = parser.parse_args()
@@ -967,3 +1015,5 @@ if __name__ == '__main__':
         write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
     elif 'zip_tallies' == args.action:
         zip_tallies(config, args.tree_path, args.elections_path, args.tallies_path, args.password)
+    elif 'generate_pdf' == args.action:
+        generate_pdf(config, args.tree_path, args.elections_path)
