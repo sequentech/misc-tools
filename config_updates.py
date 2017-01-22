@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import copy
+import codecs
 import operator
 import argparse
 import requests
@@ -837,10 +838,10 @@ def verify_results(elections_path):
                 print("%s election FAILED verification" % eid)
     except:
         # if there has been an error, remove the temporary folder
-        shutil.rmtree(tallies_path)
+        rmtree(tallies_path)
         raise
     #also remove the temp folder if everything is ok
-    shutil.rmtree(tallies_path)
+    rmtree(tallies_path)
 
 def count_votes(config, tree_path):
     '''
@@ -955,7 +956,7 @@ if __name__ == '__main__':
         '-c',
         '--config-path',
         help='default config for the election',
-        required=True)
+        default=None)
     parser.add_argument(
         '-C',
         '--changes-path',
@@ -1015,6 +1016,9 @@ if __name__ == '__main__':
     config = None
 
     if 'verify_results' != args.action:
+        if args.config_path is None:
+            print("config_updates.py: error: the following arguments are required: -c/--config-path")
+            exit(2)
         if not os.access(args.config_path, os.R_OK):
             print("config_path: can't read %s" % args.config_path)
             exit(2)
