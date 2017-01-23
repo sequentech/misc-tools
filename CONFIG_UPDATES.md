@@ -7,6 +7,7 @@ These are the actions that we currently support:
 * Remove candidate (2)
 * Add candidate (2)
 * Change candidate's category (2)
+* Verify the results of an election
 
 More actions can be easily incorporated in the future as needed.
 
@@ -40,3 +41,40 @@ The format is very simple: A single table, with a list of columns describing som
     config_updates.py -u updates.csv -c config.json --action check
     config_updates.py -u updates.csv -c config.json --action show_agora_elections_commands
     config_updates.py -u updates.csv -c config.json --action write_agora_results_files --dest-dir /tmp/agora-results-config
+
+# Election results verification
+
+Config updates also enables authorities to verify of the results of an election with the command 'verify_results'. It requires a folder as parameter, and in that folder there needs to be a number of files. For simplification, imagine that we have an election process that consists on a single election, with election id 27. Then the folder will contain:
+
+* election_ids.txt
+* election_config.json
+* 27.config.json
+* 27.config.results.json
+* 27.results.json
+
+**election_ids.txt**
+
+The contents of this file will be the list of election ids.
+
+**election_config.json**
+
+Configuration for agora-results. There is an example on agora-tools/config/config_example.json
+
+**27.config.json**
+
+Election description. It can be obtained using config_updates.py command 'download_elections' on an agora server. For example: 
+    config_updates.py -c config/config_example.json -C config/empty_corrections.tsv -e /srv/data/$PROCESS-json -i /srv/data/$PROCESS-ids.txt -a download_elections
+
+**27.config.results.json**
+
+Agora-results pipes configuration required to do the tally. These files can normally be found on agora servers, on a folder similar to /home/agoraelections/datastore/private/27/config.json
+
+**27.results.json**
+
+These are the results of the election that we want to verify. These files can normally be found on agora servers, on a folder similar to /home/agoraelections/datastore/private/27/results-18bfef57-fa96-42e1-9abb-bf0b44ffeff5/27.results.json
+
+An example verification call would be:
+
+    $ python3 config_updates.py -e ~/data/verify-id27-json -a verify_results
+
+If the verification is successful, a message "27 election VERIFIED" will be shown (one of those messages per election id). If there is a verification error for an election id, a message like "27 election FAILED verification" will be shown.

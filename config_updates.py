@@ -774,9 +774,9 @@ def verify_results(elections_path):
         with _open(path, mode='w') as f:
             return f.write(data)
 
-    pipes_config_file = 'pipes_config.json'
+    election_config_file = 'election_config.json'
     election_ids_file = 'election_ids.txt'
-    config_path =  os.path.join(elections_path, pipes_config_file)
+    config_path =  os.path.join(elections_path, election_config_file)
     tree_path = os.path.join(elections_path, election_ids_file)
 
     _check_file(tree_path)
