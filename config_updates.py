@@ -191,13 +191,14 @@ def create_verifiable_results(config, elections_path, ids_path, password):
         for election_id in election_ids:
             # copy results config
             datastore_eid_path = os.path.join(config["agora_elections_private_datastore_path"], election_id)
-            copy2(os.path.join(datastore_eid_path, 'config.json'), os.path.join(temp_path, '%i.config.results.json' % election_ids))
-            with os.scandir(datastore_eid_path) as dir_list:
-                for results_path in dir_list:
-                    if results_path.name.startswith('results-') and results_path.is_dir():
-                        results_name = "%i.results.json" % election_id
-                        copy2(os.path.join(results_path.path, results_name), os.path.join(temp_path, results_name))
-                        break
+            copy2(os.path.join(datastore_eid_path, 'config.json'), os.path.join(temp_path, '%s.config.results.json' % election_id))
+            dir_list = [d for d in os.listdir(datastore_eid_path) if os.path.isdir(os.path.join(datastore_eid_path, d))]
+            for results_path in dir_list:
+                if results_path.startswith('results-'):
+                    results_name = "%s.results.json" % election_id
+                    copy2(os.path.join(datastore_eid_path, results_path, results_name), os.path.join(temp_path, results_name))
+                    break
+
     def save_config(config, temp_path):
         # change variables to be compatible with authorities
         config["authapi"]["credentials"]["password"] = "REDACTED"
@@ -1134,7 +1135,7 @@ if __name__ == '__main__':
             calculate_results(config, args.tree_path, args.elections_path, check=False)
         elif args.action == 'verify_results':
             verify_results(args.elections_path)
-        elif args.action = 'create_verifiable_results':
+        elif args.action == 'create_verifiable_results':
             elections_path_check(os.W_OK)
             create_verifiable_results(config, args.elections_path, args.ids_path, args.password)
         elif args.action == 'check_results':
