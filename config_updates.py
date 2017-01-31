@@ -858,8 +858,7 @@ def verify_results(elections_path):
     config = json.loads(_read_file(config_path))
 
     # create temporary folder
-    tallies_path = tempfile.mkdtemp()
-    try:
+    with tempfile.TemporaryDirectory() as tallies_path:
         # verifies the results
         # tallies_path must exist
         if not os.path.isdir(tallies_path):
@@ -903,6 +902,10 @@ def verify_results(elections_path):
                 del json1["results_dirname"]
             path1 = path2 + '1'
             path2 = path2 + '2'
+            # print sha512 of results.pdf for easy verification
+            pdf_path = os.path.join(tallies_path, "%s.results.pdf" % str(eid))
+            if os.path.isfile(pdf_path):
+                print("%s - %s.results.pdf" % (hash_file(pdf_path), str(eid)))
             _write_file(path1, _serialize(json1))
             _write_file(path2, _serialize(json2))
             hash1 = hash_file(path1)
@@ -911,12 +914,6 @@ def verify_results(elections_path):
                 print("%s election VERIFIED" % eid)
             else:
                 print("%s election FAILED verification" % eid)
-    except:
-        # if there has been an error, remove the temporary folder
-        rmtree(tallies_path)
-        raise
-    #also remove the temp folder if everything is ok
-    rmtree(tallies_path)
 
 def count_votes(config, tree_path):
     '''
