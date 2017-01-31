@@ -204,7 +204,7 @@ def create_verifiable_results(config, elections_path, ids_path, password):
         config["authapi"]["credentials"]["password"] = "REDACTED"
         config["agora_results_bin_path"] = "/home/eorchestra/agora-tools/results.sh"
         config["agora_elections_private_datastore_path"] = "/srv/election-orchestra/server1/public/"
-        _write_file(os.path.join(temp_path, 'election_ids.txt'), _serialize(config))
+        _write_file(os.path.join(temp_path, 'election_config.json'), _serialize(config))
 
     def create_zip(temp_path, elections_path, password):
         out_file_path = os.path.join(elections_path, "verify.zip")
