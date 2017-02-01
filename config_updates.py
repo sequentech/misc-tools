@@ -46,6 +46,29 @@ from utils.deterministic_tar import deterministic_tar_open, deterministic_tar_ad
 from shutil import copy2, rmtree
 import pyminizip
 
+
+def _serialize(data):
+    return json.dumps(data,
+        indent=4, ensure_ascii=False, sort_keys=True, separators=(',', ': '))
+
+def _open(path, mode):
+    return codecs.open(path, encoding='utf-8', mode=mode)
+
+def _read_file(path):
+    _check_file(path)
+    with _open(path, mode='r') as f:
+        return f.read()
+
+def _check_file(path):
+    if not os.access(path, os.R_OK):
+        raise Exception("Error: can't read %s" % path)
+    if not os.path.isfile(path):
+        raise Exception("Error: not a file %s" % path)
+
+def _write_file(path, data):
+    with _open(path, mode='w') as f:
+        return f.write(data)
+
 def get_changes_tree(changes):
     '''
     Given the changes configuration, generates a simple dict based tree
@@ -128,6 +151,81 @@ def list_ids(config, changes_path, action, ids_path=None):
     l.sort()
     for election_id in l:
         print(election_id)
+
+def create_verifiable_results(config, elections_path, ids_path, password):
+    '''
+    create zip with verifiable results for authorities
+    '''
+    def get_eids():
+        election_ids = []
+        if ids_path is None:
+            raise Exception("ids_path not supplied")
+
+        with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
+            for line in f:
+                line = line.strip()
+                if len(line) > 0:
+                    election_ids.append(line)
+        if 0 == len(election_ids):
+            raise Exception("no election ids found on ids_path: %s" % ids_path)
+        election_ids.sort()
+        return election_ids
+
+    def download_eid_configs(temp_path, election_ids):
+        headers = {'content-type': 'application/json'}
+        base_url = config['agora_elections_base_url']
+        # retrieve and save each election config
+        for election_id in election_ids:
+            url = '%s/election/%s' % (base_url, election_id.strip())
+            r = requests.get(url, headers=headers)
+
+            if r.status_code != 200:
+                print(r.status_code, r.text)
+                raise Exception('Invalid status code: %d for election_id = %s' % (r.status_code, election_id))
+
+            epath = os.path.join(temp_path, "%s.config.json" % election_id)
+            with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
+                f.write(r.text)
+
+    def copy_results(election_ids, temp_path):
+        for election_id in election_ids:
+            # copy results config
+            datastore_eid_path = os.path.join(config["agora_elections_private_datastore_path"], election_id)
+            copy2(os.path.join(datastore_eid_path, 'config.json'), os.path.join(temp_path, '%s.config.results.json' % election_id))
+            dir_list = [d for d in os.listdir(datastore_eid_path) if os.path.isdir(os.path.join(datastore_eid_path, d))]
+            for results_path in dir_list:
+                if results_path.startswith('results-'):
+                    results_name = "%s.results.json" % election_id
+                    copy2(os.path.join(datastore_eid_path, results_path, results_name), os.path.join(temp_path, results_name))
+                    break
+
+    def save_config(config, temp_path):
+        # change variables to be compatible with authorities
+        config["authapi"]["credentials"]["password"] = "REDACTED"
+        config["agora_results_bin_path"] = "/home/eorchestra/agora-tools/results.sh"
+        config["agora_elections_private_datastore_path"] = "/srv/election-orchestra/server1/public/"
+        _write_file(os.path.join(temp_path, 'election_config.json'), _serialize(config))
+
+    def create_zip(temp_path, elections_path, password):
+        out_file_path = os.path.join(elections_path, "verify.zip")
+        cmd = "cd %s && 7z a -p=%s -mem=AES256 -tzip %s ." % (temp_path, password, out_file_path)
+        pass2 = "xxxxxxxxxxx"
+        cmd2 = "cd %s && 7z a -p=%s -mem=AES256 -tzip %s ." % (temp_path, pass2, out_file_path)
+        print(cmd2)
+        subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+
+    with tempfile.TemporaryDirectory() as temp_path:
+        election_ids = get_eids()
+        # get files of the type '27.config.json'
+        download_eid_configs(temp_path, election_ids)
+        # copy ids_path
+        copy2(ids_path, os.path.join(temp_path, 'election_ids.txt'))
+        # copy results of each election
+        copy_results(election_ids, temp_path)
+        # write config
+        save_config(config, temp_path)
+        # create zip with all this
+        create_zip(temp_path, elections_path, password)
 
 def download_elections(config, changes_path, elections_path, ids_path):
     '''
@@ -751,29 +849,6 @@ def calculate_results(config, tree_path, elections_path, check):
         print()
 
 def verify_results(elections_path):
-
-    def _serialize(data):
-        return json.dumps(data,
-            indent=4, ensure_ascii=False, sort_keys=True, separators=(',', ': '))
-
-    def _open(path, mode):
-        return codecs.open(path, encoding='utf-8', mode=mode)
-
-    def _read_file(path):
-        _check_file(path)
-        with _open(path, mode='r') as f:
-            return f.read()
-
-    def _check_file(path):
-        if not os.access(path, os.R_OK):
-            raise Exception("Error: can't read %s" % path)
-        if not os.path.isfile(path):
-            raise Exception("Error: not a file %s" % path)
-
-    def _write_file(path, data):
-        with _open(path, mode='w') as f:
-            return f.write(data)
-
     election_config_file = 'election_config.json'
     election_ids_file = 'election_ids.txt'
     config_path =  os.path.join(elections_path, election_config_file)
@@ -783,8 +858,7 @@ def verify_results(elections_path):
     config = json.loads(_read_file(config_path))
 
     # create temporary folder
-    tallies_path = tempfile.mkdtemp()
-    try:
+    with tempfile.TemporaryDirectory() as tallies_path:
         # verifies the results
         # tallies_path must exist
         if not os.path.isdir(tallies_path):
@@ -828,6 +902,10 @@ def verify_results(elections_path):
                 del json1["results_dirname"]
             path1 = path2 + '1'
             path2 = path2 + '2'
+            # print sha512 of results.pdf for easy verification
+            pdf_path = os.path.join(tallies_path, "%s.results.pdf" % str(eid))
+            if os.path.isfile(pdf_path):
+                print("%s - %s.results.pdf" % (hash_file(pdf_path), str(eid)))
             _write_file(path1, _serialize(json1))
             _write_file(path2, _serialize(json2))
             hash1 = hash_file(path1)
@@ -836,12 +914,6 @@ def verify_results(elections_path):
                 print("%s election VERIFIED" % eid)
             else:
                 print("%s election FAILED verification" % eid)
-    except:
-        # if there has been an error, remove the temporary folder
-        rmtree(tallies_path)
-        raise
-    #also remove the temp folder if everything is ok
-    rmtree(tallies_path)
 
 def count_votes(config, tree_path):
     '''
@@ -1005,6 +1077,7 @@ if __name__ == '__main__':
             'write_agora_results_files',
             'calculate_results',
             'verify_results',
+            'create_verifiable_results',
             'check_results',
             'count_votes',
             'tar_tallies',
@@ -1059,6 +1132,9 @@ if __name__ == '__main__':
             calculate_results(config, args.tree_path, args.elections_path, check=False)
         elif args.action == 'verify_results':
             verify_results(args.elections_path)
+        elif args.action == 'create_verifiable_results':
+            elections_path_check(os.W_OK)
+            create_verifiable_results(config, args.elections_path, args.ids_path, args.password)
         elif args.action == 'check_results':
             calculate_results(config, args.tree_path, args.elections_path, check=True)
         elif args.action == 'tar_tallies':
