@@ -162,7 +162,8 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
     def get_eids():
         election_ids = []
         if ids_path is None:
-            raise Exception("ids_path not supplied")
+            print("ids_path not supplied")
+            exit(1)
 
         with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
             for line in f:
@@ -170,7 +171,8 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
                 if len(line) > 0:
                     election_ids.append(line)
         if 0 == len(election_ids):
-            raise Exception("no election ids found on ids_path: %s" % ids_path)
+            print("no election ids found on ids_path: %s" % ids_path)
+            exit(1)
         election_ids.sort()
         return election_ids
 
@@ -191,7 +193,8 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
                 os.path.join(elections_path, "%d.results.pdf" % eid)
             ]
             if not check_files(paths):
-                raise Exception("cant read files")
+                print("cant read files")
+                exit(1)
             for path in paths:
                 copy2(path, os.path.join(temp_path, os.path.basename(path)))
 
