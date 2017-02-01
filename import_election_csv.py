@@ -94,6 +94,8 @@ def parse_extra(q):
       val["shuffle_category_list"] = parse_list(val["shuffle_category_list"])
   if "shuffle_categories" in val:
       val["shuffle_categories"] = parse_bool(val["shuffle_categories"])
+  if "shuffle_all_options" in val:
+      val["shuffle_all_options"] = parse_bool(val["shuffle_all_options"])
   return val
 
 def blocks_to_election(blocks, config, add_to_id=0):
