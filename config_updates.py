@@ -176,7 +176,7 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
         election_ids.sort()
         return election_ids
 
-    def check_files(paths, eids):
+    def check_files(paths):
         for path in paths:
             if not can_read_file(path):
                 print("can't read '%s'" % path)
