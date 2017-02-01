@@ -186,11 +186,11 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
     def copy_results(election_ids, temp_path):
         for eid in election_ids:
             paths = [
-                os.path.join(elections_path, "%d.config.results.json" % eid),
-                os.path.join(elections_path, "%d.results.json" % eid),
-                os.path.join(elections_path, "%d.results.pretty" % eid),
-                os.path.join(elections_path, "%d.results.tsv" % eid),
-                os.path.join(elections_path, "%d.results.pdf" % eid)
+                os.path.join(elections_path, "%s.config.results.json" % eid),
+                os.path.join(elections_path, "%s.results.json" % eid),
+                os.path.join(elections_path, "%s.results.pretty" % eid),
+                os.path.join(elections_path, "%s.results.tsv" % eid),
+                os.path.join(elections_path, "%s.results.pdf" % eid)
             ]
             if not check_files(paths):
                 print("cant read files")
