@@ -131,7 +131,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "min": int(q["Minimum choices"]),
             "num_winners": int(q["Number of winners"]),
             "title": q["Title"],
-            "randomize_answer_order": parse_bool(q["Randomize options order"]),
+            "randomize_answer_order": parse_bool(q.get("Randomize options order", False)),
             "tally_type": q.get("Voting system", "plurality-at-large"),
             "answer_total_votes_percentage": q["Totals"],
             "extra_options": parse_extra(q),
