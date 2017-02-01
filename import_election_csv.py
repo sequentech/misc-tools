@@ -79,6 +79,15 @@ BASE_ANSWER = {
     "text": ""
 }
 
+def parse_extra(q):
+  val = dict(
+      (key.replace("extra: ", ""), value)
+      for key, value in q.items() if key.startswith("extra: ")
+  )
+  if "shuffle_category_list" in val:
+      val["shuffle_category_list"] = val["shuffle_category_list"].split(",")
+  return val
+
 def blocks_to_election(blocks, config, add_to_id=0):
     '''
     Parses a list of blocks into an election
@@ -117,8 +126,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "randomize_answer_order": q["Randomize options order"] == "TRUE",
             "tally_type": q.get("Voting system", "plurality-at-large"),
             "answer_total_votes_percentage": q["Totals"],
-            "extra_options": dict((key.replace("extra: ", ""),value)
-                for key, value in q.items() if key.startswith("extra: ")),
+            "extra_options": parse_extra(q),
             "answers": [
               {
                   "id": int(get_answer_id(answer)),
@@ -196,8 +204,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "theme": election.get('Theme', 'default'),
             "urls": [],
             "theme_css": "",
-            "extra_options": dict((key.replace("extra: ", ""),value)
-                for key, value in election.items() if key.startswith("extra: ")),
+            "extra_options": parse_extra(q),
         },
         "end_date": (start_date + timedelta(hours=int(get_def(election, 'Duration in hours', '24')))).isoformat() + ".001",
         "start_date": start_date.isoformat() + ".001",
