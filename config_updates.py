@@ -581,6 +581,20 @@ def post_process_results_config(
                     "withdrawed_candidates": withdrawls
                 }
             ])
+        elif config["agora_results_config_parity"]["method"] == "desborda":
+            cfg = config["agora_results_config_parity"]
+            withdrawls = []
+            if "tie_withdrawals" in election_config:
+                withdrawls = election_config['tie_withdrawals'][str(election_id)]
+            results_config.append([
+                "agora_results.pipes.desborda.podemos_desborda",
+                {
+                    "women_names":[
+                        i['answer_text']
+                        for i in cfg['parity_list']
+                        if i['is_woman'] and int(i['election_id']) == int(election_id)]
+                }
+            ])
         elif config["agora_results_config_parity"]["method"] == "parity_zip_plurality_at_large":
             cfg = config["agora_results_config_parity"]
             results_config.append([
@@ -626,7 +640,10 @@ def parse_parity_config(config):
     '''
     if "agora_results_config_parity" in config:
         parity_list = []
-        if config["agora_results_config_parity"]["method"] == "podemos_proportion_rounded_and_duplicates":
+        if config["agora_results_config_parity"]["method"] in [
+            "podemos_proportion_rounded_and_duplicates",
+            "desborda"
+          ]:
             path = config["agora_results_config_parity"]['sexes_tsv']
             with open(path, mode='r', encoding="utf-8", errors='strict') as f:
                 for line in f:
