@@ -587,7 +587,7 @@ def post_process_results_config(
                 "agora_results.pipes.desborda.podemos_desborda",
                 {
                     "women_names":[
-                        i['answer_text']
+                        i['answer_text'].replace("\"", "")
                         for i in cfg['parity_list']
                         if i['is_woman'] and int(i['election_id']) == int(election_id)]
                 }
