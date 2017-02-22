@@ -213,8 +213,8 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
         cmd2 = "cd %s && 7z a -p=%s -mem=AES256 -tzip %s ." % (temp_path, pass2, out_file_path)
         print(cmd2)
         subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
-        cmd = "cd %s && zip -P=%s %s -r ./" % (temp_path, password, out_file_path)
-        cmd2 = "cd %s && zip -P=%s %s -r ./" % (temp_path, pass2, out_file_path)
+        cmd = "cd %s && zip -P=%s %s -r ./" % (temp_path, password, out_file_path2)
+        cmd2 = "cd %s && zip -P=%s %s -r ./" % (temp_path, pass2, out_file_path2)
         print(cmd2)
         subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
 
