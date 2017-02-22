@@ -152,14 +152,18 @@ def list_ids(config, changes_path, action, ids_path=None):
     for election_id in l:
         print(election_id)
 
-def create_verifiable_results(config, elections_path, ids_path, password):
+def create_verifiable_results(config, elections_path, ids_path, tallies_path, password):
     '''
     create zip with verifiable results for authorities
     '''
+    def can_read_file(f):
+      return os.access(f, os.R_OK) and os.path.isfile(f)
+
     def get_eids():
         election_ids = []
         if ids_path is None:
-            raise Exception("ids_path not supplied")
+            print("ids_path not supplied")
+            exit(1)
 
         with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
             for line in f:
@@ -167,37 +171,32 @@ def create_verifiable_results(config, elections_path, ids_path, password):
                 if len(line) > 0:
                     election_ids.append(line)
         if 0 == len(election_ids):
-            raise Exception("no election ids found on ids_path: %s" % ids_path)
+            print("no election ids found on ids_path: %s" % ids_path)
+            exit(1)
         election_ids.sort()
         return election_ids
 
-    def download_eid_configs(temp_path, election_ids):
-        headers = {'content-type': 'application/json'}
-        base_url = config['agora_elections_base_url']
-        # retrieve and save each election config
-        for election_id in election_ids:
-            url = '%s/election/%s' % (base_url, election_id.strip())
-            r = requests.get(url, headers=headers)
-
-            if r.status_code != 200:
-                print(r.status_code, r.text)
-                raise Exception('Invalid status code: %d for election_id = %s' % (r.status_code, election_id))
-
-            epath = os.path.join(temp_path, "%s.config.json" % election_id)
-            with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
-                f.write(r.text)
+    def check_files(paths):
+        for path in paths:
+            if not can_read_file(path):
+                print("can't read '%s'" % path)
+                return False
+        return True
 
     def copy_results(election_ids, temp_path):
-        for election_id in election_ids:
-            # copy results config
-            datastore_eid_path = os.path.join(config["agora_elections_private_datastore_path"], election_id)
-            copy2(os.path.join(datastore_eid_path, 'config.json'), os.path.join(temp_path, '%s.config.results.json' % election_id))
-            dir_list = [d for d in os.listdir(datastore_eid_path) if os.path.isdir(os.path.join(datastore_eid_path, d))]
-            for results_path in dir_list:
-                if results_path.startswith('results-'):
-                    results_name = "%s.results.json" % election_id
-                    copy2(os.path.join(datastore_eid_path, results_path, results_name), os.path.join(temp_path, results_name))
-                    break
+        for eid in election_ids:
+            paths = [
+                os.path.join(elections_path, "%s.config.results.json" % eid),
+                os.path.join(elections_path, "%s.results.json" % eid),
+                os.path.join(elections_path, "%s.results.pretty" % eid),
+                os.path.join(elections_path, "%s.results.tsv" % eid),
+                os.path.join(elections_path, "%s.results.pdf" % eid)
+            ]
+            if not check_files(paths):
+                print("cant read files")
+                exit(1)
+            for path in paths:
+                copy2(path, os.path.join(temp_path, os.path.basename(path)))
 
     def save_config(config, temp_path):
         # change variables to be compatible with authorities
@@ -206,18 +205,21 @@ def create_verifiable_results(config, elections_path, ids_path, password):
         config["agora_elections_private_datastore_path"] = "/srv/election-orchestra/server1/public/"
         _write_file(os.path.join(temp_path, 'election_config.json'), _serialize(config))
 
-    def create_zip(temp_path, elections_path, password):
-        out_file_path = os.path.join(elections_path, "verify.zip")
+    def create_zip(temp_path, tallies_path, password):
+        out_file_path = os.path.join(tallies_path, "verify.zip")
+        out_file_path2 = os.path.join(tallies_path, "verify2.zip")
         cmd = "cd %s && 7z a -p=%s -mem=AES256 -tzip %s ." % (temp_path, password, out_file_path)
         pass2 = "xxxxxxxxxxx"
         cmd2 = "cd %s && 7z a -p=%s -mem=AES256 -tzip %s ." % (temp_path, pass2, out_file_path)
         print(cmd2)
         subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+        cmd = "cd %s && zip -P=%s %s -r ./" % (temp_path, password, out_file_path2)
+        cmd2 = "cd %s && zip -P=%s %s -r ./" % (temp_path, pass2, out_file_path2)
+        print(cmd2)
+        subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
 
     with tempfile.TemporaryDirectory() as temp_path:
         election_ids = get_eids()
-        # get files of the type '27.config.json'
-        download_eid_configs(temp_path, election_ids)
         # copy ids_path
         copy2(ids_path, os.path.join(temp_path, 'election_ids.txt'))
         # copy results of each election
@@ -225,7 +227,7 @@ def create_verifiable_results(config, elections_path, ids_path, password):
         # write config
         save_config(config, temp_path)
         # create zip with all this
-        create_zip(temp_path, elections_path, password)
+        create_zip(temp_path, tallies_path, password)
 
 def download_elections(config, changes_path, elections_path, ids_path):
     '''
@@ -581,6 +583,20 @@ def post_process_results_config(
                     "withdrawed_candidates": withdrawls
                 }
             ])
+        elif config["agora_results_config_parity"]["method"] == "desborda":
+            cfg = config["agora_results_config_parity"]
+            withdrawls = []
+            if "tie_withdrawals" in election_config:
+                withdrawls = election_config['tie_withdrawals'][str(election_id)]
+            results_config.append([
+                "agora_results.pipes.desborda.podemos_desborda",
+                {
+                    "women_names":[
+                        i['answer_text'].replace("\"", "")
+                        for i in cfg['parity_list']
+                        if i['is_woman'] and int(i['election_id']) == int(election_id)]
+                }
+            ])
         elif config["agora_results_config_parity"]["method"] == "parity_zip_plurality_at_large":
             cfg = config["agora_results_config_parity"]
             results_config.append([
@@ -626,7 +642,10 @@ def parse_parity_config(config):
     '''
     if "agora_results_config_parity" in config:
         parity_list = []
-        if config["agora_results_config_parity"]["method"] == "podemos_proportion_rounded_and_duplicates":
+        if config["agora_results_config_parity"]["method"] in [
+            "podemos_proportion_rounded_and_duplicates",
+            "desborda"
+          ]:
             path = config["agora_results_config_parity"]['sexes_tsv']
             with open(path, mode='r', encoding="utf-8", errors='strict') as f:
                 for line in f:
@@ -966,7 +985,8 @@ def zip_tallies(config, tree_path, elections_path, tallies_path, password):
         paths = [
             os.path.join(elections_path, "%d.results.json" % last_id),
             os.path.join(elections_path, "%d.results.pretty" % last_id),
-            os.path.join(elections_path, "%d.results.tsv" % last_id)
+            os.path.join(elections_path, "%d.results.tsv" % last_id),
+            os.path.join(elections_path, "%d.results.pdf" % last_id)
         ]
 
         if not check_files(paths, eids):
@@ -1134,7 +1154,7 @@ if __name__ == '__main__':
             verify_results(args.elections_path)
         elif args.action == 'create_verifiable_results':
             elections_path_check(os.W_OK)
-            create_verifiable_results(config, args.elections_path, args.ids_path, args.password)
+            create_verifiable_results(config, args.elections_path, args.ids_path, args.tallies_path, args.password)
         elif args.action == 'check_results':
             calculate_results(config, args.tree_path, args.elections_path, check=True)
         elif args.action == 'tar_tallies':
