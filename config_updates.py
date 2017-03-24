@@ -33,6 +33,7 @@ import hashlib
 import collections
 from datetime import datetime, timedelta
 import tempfile
+import traceback
 
 from datadiff import diff
 
@@ -162,8 +163,7 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
     def get_eids():
         election_ids = []
         if ids_path is None:
-            print("ids_path not supplied")
-            exit(1)
+            raise Exception("ids_path not supplied")
 
         with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
             for line in f:
@@ -171,8 +171,7 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
                 if len(line) > 0:
                     election_ids.append(line)
         if 0 == len(election_ids):
-            print("no election ids found on ids_path: %s" % ids_path)
-            exit(1)
+            raise Exception("no election ids found on ids_path: %s" % ids_path)
         election_ids.sort()
         return election_ids
 
@@ -193,8 +192,7 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
                 os.path.join(elections_path, "%s.results.pdf" % eid)
             ]
             if not check_files(paths):
-                print("cant read files")
-                exit(1)
+                raise Exception("cant read files")
             for path in paths:
                 copy2(path, os.path.join(temp_path, os.path.basename(path)))
 
@@ -881,7 +879,7 @@ def verify_results(elections_path):
         # verifies the results
         # tallies_path must exist
         if not os.path.isdir(tallies_path):
-            print("%s path doesn't exist or is not a folder" % tallies_path)
+            raise Exception("%s path doesn't exist or is not a folder" % tallies_path)
 
         cfg_res_postfix = '.config.results.json'
         # list of elections
@@ -1168,5 +1166,6 @@ if __name__ == '__main__':
             zip_tallies(config, args.tree_path, args.elections_path, args.tallies_path, args.password)
         elif 'generate_pdf' == args.action:
             generate_pdf(config, args.tree_path, args.elections_path)
-    except:
+    except Exception as ex:
+        print(traceback.format_exc())
         exit(2)
