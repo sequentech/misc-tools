@@ -79,6 +79,25 @@ BASE_ANSWER = {
     "text": ""
 }
 
+def parse_list(s):
+    return s.split(",")
+
+def parse_bool(s):
+    return s == "TRUE"
+
+def parse_extra(q):
+  val = dict(
+      (key.replace("extra: ", ""), value)
+      for key, value in q.items() if key.startswith("extra: ")
+  )
+  if "shuffle_category_list" in val:
+      val["shuffle_category_list"] = parse_list(val["shuffle_category_list"])
+  if "shuffle_categories" in val:
+      val["shuffle_categories"] = parse_bool(val["shuffle_categories"])
+  if "shuffle_all_options" in val:
+      val["shuffle_all_options"] = parse_bool(val["shuffle_all_options"])
+  return val
+
 def blocks_to_election(blocks, config, add_to_id=0):
     '''
     Parses a list of blocks into an election
@@ -114,11 +133,10 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "min": int(q["Minimum choices"]),
             "num_winners": int(q["Number of winners"]),
             "title": q["Title"],
-            "randomize_answer_order": q["Randomize options order"] == "TRUE",
+            "randomize_answer_order": parse_bool(q.get("Randomize options order", False)),
             "tally_type": q.get("Voting system", "plurality-at-large"),
             "answer_total_votes_percentage": q["Totals"],
-            "extra_options": dict((key.replace("extra: ", ""),value)
-                for key, value in q.items() if key.startswith("extra: ")),
+            "extra_options": parse_extra(q),
             "answers": [
               {
                   "id": int(get_answer_id(answer)),
@@ -196,8 +214,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "theme": election.get('Theme', 'default'),
             "urls": [],
             "theme_css": "",
-            "extra_options": dict((key.replace("extra: ", ""),value)
-                for key, value in election.items() if key.startswith("extra: ")),
+            "extra_options": parse_extra(q),
         },
         "end_date": (start_date + timedelta(hours=int(get_def(election, 'Duration in hours', '24')))).isoformat() + ".001",
         "start_date": start_date.isoformat() + ".001",

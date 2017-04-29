@@ -101,7 +101,7 @@ def show_votes(result):
     v.padding_width = 1
     for row in result:
         v.add_row(map(truncate, row))
-    print v
+    print(v)
 
 def get_db_connection(dbCfg):
     engine = create_engine('postgresql+psycopg2://%s:%s@localhost/%s' % (dbCfg['user'], dbCfg['password'], dbCfg['dbname']))

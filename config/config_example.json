@@ -9,18 +9,13 @@
   ],
   "agora_results_config_sorting": [
     [
-      "agora_results.pipes.sort_plurality_at_large.sort_plurality_at_large",
-      {"withdrawals": []}
+      "agora_results.pipes.sort.sort_non_iterative",
+      {"question_indexes": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}
     ]
   ],
-  "agora_results_config_parity": {
-    "sexes_tsv": "paridad.tsv",
-    "method": "podemos_proportion_rounded_and_duplicates",
-    "proportions": [60, 40]
-  },
   "agora_elections_base_url": "http://localhost:9000/api",
   "agora_results_bin_path": "/home/agoraelections/agora-tools/agora_results.sh",
-  "agora_elections_private_datastore_path": "/home/agoraelections/agora-elections/datastore/private/",
+  "agora_elections_private_datastore_path": "/home/agoraelections/datastore/private/",
   "global_prechanges": [
     [
       "map_question_maximums_and_winners",

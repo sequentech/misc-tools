@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import copy
+import codecs
 import operator
 import argparse
 import requests
@@ -31,6 +32,8 @@ import subprocess
 import hashlib
 import collections
 from datetime import datetime, timedelta
+import tempfile
+import traceback
 
 from datadiff import diff
 
@@ -41,7 +44,31 @@ from utils.tree import (edges2simpletree, list_edges, list_leaves, list_all,
 from utils.hashed_changes import hash_question
 from utils.deterministic_tar import deterministic_tar_open, deterministic_tar_add
 
-from shutil import copy2
+from shutil import copy2, rmtree
+import pyminizip
+
+
+def _serialize(data):
+    return json.dumps(data,
+        indent=4, ensure_ascii=False, sort_keys=True, separators=(',', ': '))
+
+def _open(path, mode):
+    return codecs.open(path, encoding='utf-8', mode=mode)
+
+def _read_file(path):
+    _check_file(path)
+    with _open(path, mode='r') as f:
+        return f.read()
+
+def _check_file(path):
+    if not os.access(path, os.R_OK):
+        raise Exception("Error: can't read %s" % path)
+    if not os.path.isfile(path):
+        raise Exception("Error: not a file %s" % path)
+
+def _write_file(path, data):
+    with _open(path, mode='w') as f:
+        return f.write(data)
 
 def get_changes_tree(changes):
     '''
@@ -125,6 +152,80 @@ def list_ids(config, changes_path, action, ids_path=None):
     l.sort()
     for election_id in l:
         print(election_id)
+
+def create_verifiable_results(config, elections_path, ids_path, tallies_path, password):
+    '''
+    create zip with verifiable results for authorities
+    '''
+    def can_read_file(f):
+      return os.access(f, os.R_OK) and os.path.isfile(f)
+
+    def get_eids():
+        election_ids = []
+        if ids_path is None:
+            raise Exception("ids_path not supplied")
+
+        with open(ids_path, mode='r', encoding="utf-8", errors='strict') as f:
+            for line in f:
+                line = line.strip()
+                if len(line) > 0:
+                    election_ids.append(line)
+        if 0 == len(election_ids):
+            raise Exception("no election ids found on ids_path: %s" % ids_path)
+        election_ids.sort()
+        return election_ids
+
+    def check_files(paths):
+        for path in paths:
+            if not can_read_file(path):
+                print("can't read '%s'" % path)
+                return False
+        return True
+
+    def copy_results(election_ids, temp_path):
+        for eid in election_ids:
+            paths = [
+                os.path.join(elections_path, "%s.config.results.json" % eid),
+                os.path.join(elections_path, "%s.results.json" % eid),
+                os.path.join(elections_path, "%s.results.pretty" % eid),
+                os.path.join(elections_path, "%s.results.tsv" % eid),
+                os.path.join(elections_path, "%s.results.pdf" % eid)
+            ]
+            if not check_files(paths):
+                raise Exception("cant read files")
+            for path in paths:
+                copy2(path, os.path.join(temp_path, os.path.basename(path)))
+
+    def save_config(config, temp_path):
+        # change variables to be compatible with authorities
+        config["authapi"]["credentials"]["password"] = "REDACTED"
+        config["agora_results_bin_path"] = "/home/eorchestra/agora-tools/results.sh"
+        config["agora_elections_private_datastore_path"] = "/srv/election-orchestra/server1/public/"
+        _write_file(os.path.join(temp_path, 'election_config.json'), _serialize(config))
+
+    def create_zip(temp_path, tallies_path, password):
+        out_file_path = os.path.join(tallies_path, "verify.zip")
+        out_file_path2 = os.path.join(tallies_path, "verify2.zip")
+        cmd = "cd %s && 7z a -p=%s -mem=AES256 -tzip %s ." % (temp_path, password, out_file_path)
+        pass2 = "xxxxxxxxxxx"
+        cmd2 = "cd %s && 7z a -p=%s -mem=AES256 -tzip %s ." % (temp_path, pass2, out_file_path)
+        print(cmd2)
+        subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+        cmd = "cd %s && zip -P=%s %s -r ./" % (temp_path, password, out_file_path2)
+        cmd2 = "cd %s && zip -P=%s %s -r ./" % (temp_path, pass2, out_file_path2)
+        print(cmd2)
+        subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+
+    with tempfile.TemporaryDirectory() as temp_path:
+        election_ids = get_eids()
+        # copy ids_path
+        copy2(ids_path, os.path.join(temp_path, 'election_ids.txt'))
+        # copy results of each election
+        copy_results(election_ids, temp_path)
+        # write config
+        save_config(config, temp_path)
+        # create zip with all this
+        create_zip(temp_path, tallies_path, password)
 
 def download_elections(config, changes_path, elections_path, ids_path):
     '''
@@ -480,6 +581,20 @@ def post_process_results_config(
                     "withdrawed_candidates": withdrawls
                 }
             ])
+        elif config["agora_results_config_parity"]["method"] == "desborda":
+            cfg = config["agora_results_config_parity"]
+            withdrawls = []
+            if "tie_withdrawals" in election_config:
+                withdrawls = election_config['tie_withdrawals'][str(election_id)]
+            results_config.append([
+                "agora_results.pipes.desborda.podemos_desborda",
+                {
+                    "women_names":[
+                        i['answer_text'].replace("\"", "")
+                        for i in cfg['parity_list']
+                        if i['is_woman'] and int(i['election_id']) == int(election_id)]
+                }
+            ])
         elif config["agora_results_config_parity"]["method"] == "parity_zip_plurality_at_large":
             cfg = config["agora_results_config_parity"]
             results_config.append([
@@ -525,7 +640,10 @@ def parse_parity_config(config):
     '''
     if "agora_results_config_parity" in config:
         parity_list = []
-        if config["agora_results_config_parity"]["method"] == "podemos_proportion_rounded_and_duplicates":
+        if config["agora_results_config_parity"]["method"] in [
+            "podemos_proportion_rounded_and_duplicates",
+            "desborda"
+          ]:
             path = config["agora_results_config_parity"]['sexes_tsv']
             with open(path, mode='r', encoding="utf-8", errors='strict') as f:
                 for line in f:
@@ -638,6 +756,51 @@ def hash_file(filePath):
 
     return hasha.hexdigest()
 
+def create_pdf(election_id, cfg_res_postfix, elections_path, bin_path, oformat, tallies, only_check=False):
+    cmd = "%s -t %s -c %s -o %s -eid %d" % (
+        bin_path,
+        " ".join(tallies),
+        os.path.join(elections_path, str(election_id) + cfg_res_postfix),
+        'pdf',
+        election_id)
+
+    print(cmd)
+    if only_check:
+        return
+    # f_path = os.path.join(elections_path, str(last_id) + ".results.pdf" + oformat)
+    subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+
+def generate_pdf(config, tree_path, elections_path):
+    '''
+    Launches agora-results to generate a pdf for those elections that do 
+    have a tally
+    '''
+    with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
+        tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
+
+    priv_path = config["agora_elections_private_datastore_path"]
+    bin_path = config['agora_results_bin_path']
+    cfg_res_postfix = '.config.results.json'
+
+    for eids in tree:
+        # check for config file
+        last_id = eids[-1]
+
+        # check for tallies
+        tallies = []
+        for eid in eids:
+            tally_path = os.path.join(priv_path, str(eid), 'tally.tar.gz')
+            ids_path = os.path.join(priv_path, str(eid), 'ids')
+            if not os.path.isfile(ids_path):
+                print("eids = %s, eid %d has not even ids, passing" % (json.dumps(eids), eid))
+            if not os.path.isfile(tally_path):
+                print("eids = %s, eid %d has no tally (yet?), passing" % (json.dumps(eids), eid))
+                break
+            tallies.append(tally_path)
+
+        print("eids = %s: creating pdf.. " % json.dumps(eids), end="")
+        create_pdf(last_id, cfg_res_postfix, elections_path, bin_path, "pdf", tallies)
+
 def calculate_results(config, tree_path, elections_path, check):
     '''
     Launches agora-results for those elections that do have a tally
@@ -691,58 +854,83 @@ def calculate_results(config, tree_path, elections_path, check):
                 return
             f_path = os.path.join(elections_path, str(last_id) + ".results." + oformat)
             with open(f_path, mode='w', encoding="utf-8", errors='strict') as f:
+                print(cmd)
                 subprocess.check_call(cmd, stdout=f, stderr=sys.stderr, shell=True)
 
         bin_path = config['agora_results_bin_path']
         create_results(last_id, cfg_res_postfix, elections_path, bin_path, "json", only_check=check)
         if not check:
+            create_pdf(last_id, cfg_res_postfix, elections_path, bin_path, "pdf", tallies)
             create_results(last_id, cfg_res_postfix, elections_path, bin_path, "tsv")
             create_results(last_id, cfg_res_postfix, elections_path, bin_path, "pretty")
         print()
 
-def verify_results(config, tree_path, elections_path, tallies_path):
-    # verifies the results
-    # tallies_path must exist
-    if not os.path.isdir(tallies_path):
-        print("%s path doesn't exist or is not a folder" % tallies_path)
+def verify_results(elections_path):
+    election_config_file = 'election_config.json'
+    election_ids_file = 'election_ids.txt'
+    config_path =  os.path.join(elections_path, election_config_file)
+    tree_path = os.path.join(elections_path, election_ids_file)
 
-    cfg_res_postfix = '.config.results.json'
-    # list of elections
-    ids_w_res_config = [
-        int(f.replace(cfg_res_postfix, ''))
-        for f in os.listdir(elections_path)
-        if os.path.isfile(os.path.join(elections_path, f)) and f.endswith(cfg_res_postfix)]
+    _check_file(tree_path)
+    config = json.loads(_read_file(config_path))
 
-    res_postfix = '.results.json'
-    ids_w_res = [
-        int(f)
-        for f in ids_w_res_config
-        if os.path.isfile(os.path.join(elections_path, str(f) + res_postfix))]
+    # create temporary folder
+    with tempfile.TemporaryDirectory() as tallies_path:
+        # verifies the results
+        # tallies_path must exist
+        if not os.path.isdir(tallies_path):
+            raise Exception("%s path doesn't exist or is not a folder" % tallies_path)
 
-    if len(ids_w_res) != len(ids_w_res_config):
-        ids_not_included = [
-            item
-            for item in ids_w_res_config
-            if item not in ids_w_res]
-        print("the following eids don't have a result to verify: %s" % ids_not_included)
+        cfg_res_postfix = '.config.results.json'
+        # list of elections
+        ids_w_res_config = [
+            int(f.replace(cfg_res_postfix, ''))
+            for f in os.listdir(elections_path)
+            if os.path.isfile(os.path.join(elections_path, f)) and f.endswith(cfg_res_postfix)]
 
-    # copy config files to output folder
-    for eid in ids_w_res:
-        copy2(os.path.join(elections_path, str(eid) + cfg_res_postfix), os.path.join(tallies_path, str(eid) + cfg_res_postfix))
+        res_postfix = '.results.json'
+        ids_w_res = [
+            int(f)
+            for f in ids_w_res_config
+            if os.path.isfile(os.path.join(elections_path, str(f) + res_postfix))]
 
-    calculate_results(config, tree_path, tallies_path, check=False)
+        if len(ids_w_res) != len(ids_w_res_config):
+            ids_not_included = [
+                item
+                for item in ids_w_res_config
+                if item not in ids_w_res]
+            print("the following eids don't have a result to verify: %s" % ids_not_included)
 
-    for eid in ids_w_res:
-        if not os.path.isfile(os.path.join(tallies_path, str(eid) + res_postfix)):
-            print("election %s results are missing, passing" % eid)
-            continue
+        # copy config files to output folder
+        for eid in ids_w_res:
+            copy2(os.path.join(elections_path, str(eid) + cfg_res_postfix), os.path.join(tallies_path, str(eid) + cfg_res_postfix))
 
-        hash1 = hash_file(os.path.join(elections_path, str(eid) + res_postfix))
-        hash2 = hash_file(os.path.join(tallies_path, str(eid) + res_postfix))
-        if hash1 == hash2:
-            print("%s election VERIFIED" % eid)
-        else:
-            print("%s election FAILED verification" % eid)
+        calculate_results(config, tree_path, tallies_path, check=False)
+
+        for eid in ids_w_res:
+            if not os.path.isfile(os.path.join(tallies_path, str(eid) + res_postfix)):
+                print("election %s results are missing, passing" % eid)
+                continue
+            path1 = os.path.join(elections_path, str(eid) + res_postfix)
+            path2 = os.path.join(tallies_path, str(eid) + res_postfix)
+            json1 = json.loads(_read_file(path1))
+            json2 = json.loads(_read_file(path2))
+            if "results_dirname" in json1:
+                del json1["results_dirname"]
+            path1 = path2 + '1'
+            path2 = path2 + '2'
+            # print sha512 of results.pdf for easy verification
+            pdf_path = os.path.join(tallies_path, "%s.results.pdf" % str(eid))
+            if os.path.isfile(pdf_path):
+                print("%s - %s.results.pdf" % (hash_file(pdf_path), str(eid)))
+            _write_file(path1, _serialize(json1))
+            _write_file(path2, _serialize(json2))
+            hash1 = hash_file(path1)
+            hash2 = hash_file(path2)
+            if hash1 == hash2:
+                print("%s election VERIFIED" % eid)
+            else:
+                print("%s election FAILED verification" % eid)
 
 def count_votes(config, tree_path):
     '''
@@ -772,6 +960,39 @@ def count_votes(config, tree_path):
             total_votes += n_votes2
         print("%s = %s" % (json.dumps(eids), json.dumps(n_votes)))
     print("total votes: %d" % total_votes)
+
+def zip_tallies(config, tree_path, elections_path, tallies_path, password):
+    with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
+        tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
+
+    if password is None:
+        return
+    def can_read_file(f):
+      return os.access(f, os.R_OK) and os.path.isfile(f)
+
+    def check_files(paths, eids):
+        for path in paths:
+            if not can_read_file(path):
+                print("eids = %s, has no %s, passing" % (
+                    json.dumps(eids), path))
+                return False
+        return True
+
+    for eids in tree:
+        last_id = eids[-1]
+        paths = [
+            os.path.join(elections_path, "%d.results.json" % last_id),
+            os.path.join(elections_path, "%d.results.pretty" % last_id),
+            os.path.join(elections_path, "%d.results.tsv" % last_id),
+            os.path.join(elections_path, "%d.results.pdf" % last_id)
+        ]
+
+        if not check_files(paths, eids):
+            continue
+        # create zip
+        zip_path = os.path.join(tallies_path, "%d.zip" % last_id)
+        print("creating %s .." % zip_path)
+        pyminizip.compress_multiple(paths, zip_path, password, 9)
 
 def tar_tallies(config, tree_path, elections_path, tallies_path):
     '''
@@ -825,7 +1046,7 @@ if __name__ == '__main__':
         '-c',
         '--config-path',
         help='default config for the election',
-        required=True)
+        default=None)
     parser.add_argument(
         '-C',
         '--changes-path',
@@ -845,6 +1066,11 @@ if __name__ == '__main__':
         '-i',
         '--ids-path',
         help='path to the file with all the election ids, one per line',
+        default=None)
+    parser.add_argument(
+        '-p',
+        '--password',
+        help='password for the zip file',
         default=None)
 
     parser.add_argument(
@@ -869,23 +1095,30 @@ if __name__ == '__main__':
             'write_agora_results_files',
             'calculate_results',
             'verify_results',
+            'create_verifiable_results',
             'check_results',
             'count_votes',
-            'tar_tallies'],
+            'tar_tallies',
+            'zip_tallies',
+            'generate_pdf'],
         required=True)
 
     args = parser.parse_args()
-
-    if not os.access(args.config_path, os.R_OK):
-        print("config_path: can't read %s" % args.config_path)
-        exit(2)
-    if not os.path.isfile(args.config_path):
-        print("config_path: not a file %s" % args.config_path)
-        exit(2)
-
     config = None
-    with open(args.config_path, mode='r', encoding="utf-8", errors='strict') as f:
-        config = json.loads(f.read())
+
+    if 'verify_results' != args.action:
+        if args.config_path is None:
+            print("config_updates.py: error: the following arguments are required: -c/--config-path")
+            exit(2)
+        if not os.access(args.config_path, os.R_OK):
+            print("config_path: can't read %s" % args.config_path)
+            exit(2)
+        if not os.path.isfile(args.config_path):
+            print("config_path: not a file %s" % args.config_path)
+            exit(2)
+
+        with open(args.config_path, mode='r', encoding="utf-8", errors='strict') as f:
+            config = json.loads(f.read())
 
     def elections_path_check(acces_check):
         if not os.path.isdir(args.elections_path):
@@ -894,35 +1127,45 @@ if __name__ == '__main__':
         if not os.access(args.elections_path, acces_check):
             print("elections_path: can't read %s" % args.elections_path)
             exit(2)
-
-    if args.action == 'print_tree_ids':
-        list_ids(config, args.changes_path, action="tree")
-    elif args.action == 'print_edges_ids':
-        list_ids(config, args.changes_path, action="edges")
-    elif args.action == 'print_leaves_ids':
-        list_ids(config, args.changes_path, action="leaves")
-    elif args.action == 'print_leaves_ancestors_ids':
-        list_ids(config, args.changes_path, action="leaves_ancestors", ids_path=args.ids_path)
-    elif args.action == 'print_all_ids':
-        list_ids(config, args.changes_path, action="all")
-    elif args.action == 'print_all_with_others_ids':
-        list_ids(config, args.changes_path, action="all_with_others", ids_path=args.ids_path)
-    elif args.action == 'download_elections':
-        elections_path_check(os.W_OK)
-        download_elections(config, args.changes_path, args.elections_path, args.ids_path)
-    elif args.action == 'check_changes':
-        elections_path_check(os.R_OK)
-        check_changes(config, args.changes_path, args.elections_path, args.ids_path)
-    elif args.action == 'calculate_results':
-        calculate_results(config, args.tree_path, args.elections_path, check=False)
-    elif args.action == 'verify_results':
-        verify_results(config, args.tree_path, args.elections_path, args.tallies_path)
-    elif args.action == 'check_results':
-        calculate_results(config, args.tree_path, args.elections_path, check=True)
-    elif args.action == 'tar_tallies':
-        tar_tallies(config, args.tree_path, args.elections_path, args.tallies_path)
-    elif args.action == 'count_votes':
-        count_votes(config, args.tree_path)
-    elif args.action == 'write_agora_results_files':
-        elections_path_check(os.W_OK)
-        write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
+    try:
+        if args.action == 'print_tree_ids':
+            list_ids(config, args.changes_path, action="tree")
+        elif args.action == 'print_edges_ids':
+            list_ids(config, args.changes_path, action="edges")
+        elif args.action == 'print_leaves_ids':
+            list_ids(config, args.changes_path, action="leaves")
+        elif args.action == 'print_leaves_ancestors_ids':
+            list_ids(config, args.changes_path, action="leaves_ancestors", ids_path=args.ids_path)
+        elif args.action == 'print_all_ids':
+            list_ids(config, args.changes_path, action="all")
+        elif args.action == 'print_all_with_others_ids':
+            list_ids(config, args.changes_path, action="all_with_others", ids_path=args.ids_path)
+        elif args.action == 'download_elections':
+            elections_path_check(os.W_OK)
+            download_elections(config, args.changes_path, args.elections_path, args.ids_path)
+        elif args.action == 'check_changes':
+            elections_path_check(os.R_OK)
+            check_changes(config, args.changes_path, args.elections_path, args.ids_path)
+        elif args.action == 'calculate_results':
+            calculate_results(config, args.tree_path, args.elections_path, check=False)
+        elif args.action == 'verify_results':
+            verify_results(args.elections_path)
+        elif args.action == 'create_verifiable_results':
+            elections_path_check(os.W_OK)
+            create_verifiable_results(config, args.elections_path, args.ids_path, args.tallies_path, args.password)
+        elif args.action == 'check_results':
+            calculate_results(config, args.tree_path, args.elections_path, check=True)
+        elif args.action == 'tar_tallies':
+            tar_tallies(config, args.tree_path, args.elections_path, args.tallies_path)
+        elif args.action == 'count_votes':
+            count_votes(config, args.tree_path)
+        elif args.action == 'write_agora_results_files':
+            elections_path_check(os.W_OK)
+            write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
+        elif 'zip_tallies' == args.action:
+            zip_tallies(config, args.tree_path, args.elections_path, args.tallies_path, args.password)
+        elif 'generate_pdf' == args.action:
+            generate_pdf(config, args.tree_path, args.elections_path)
+    except Exception as ex:
+        print(traceback.format_exc())
+        exit(2)

@@ -7,6 +7,7 @@ These are the actions that we currently support:
 * Remove candidate (2)
 * Add candidate (2)
 * Change candidate's category (2)
+* Verify the results of an election
 
 More actions can be easily incorporated in the future as needed.
 
@@ -40,3 +41,17 @@ The format is very simple: A single table, with a list of columns describing som
     config_updates.py -u updates.csv -c config.json --action check
     config_updates.py -u updates.csv -c config.json --action show_agora_elections_commands
     config_updates.py -u updates.csv -c config.json --action write_agora_results_files --dest-dir /tmp/agora-results-config
+
+# Election results verification
+
+Once the election results have been calculated, a zip file with the results can be created which can be used by election authorities to reproduce the results. In order to create the zip, execute on an agora server, from user agoraelections, on agora-tools:
+
+    python3 config_updates.py -c config/config_example.json -e /path/to/folder -i /path/to/election-ids.txt -p <PASSWORD> -a create_verifiable_results
+
+This will create a zip file called verify.zip on path /path/to/folder with password <PASSWORD>, for elections with the election ids listed on file /path/to/election-ids.txt
+
+Then, copy verify.zip to an election authority, and unzip it on a folder (example: /path/to/folder) and, from user eorchestra, on /home/eorchestra/agora-tools, execute:
+
+     $ python3 config_updates.py -e /path/to/folder -a verify_results
+
+If the verification is successful, a message "27 election VERIFIED" will be shown (one of those messages per election id). If there is a verification error for an election id, a message like "27 election FAILED verification" will be shown.
