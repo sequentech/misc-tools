@@ -89,8 +89,7 @@ def csv_to_blocks(path, separator=",", strip_values=True):
 
     with open(path, mode='r', encoding="utf-8", errors='strict') as f:
         fcsv = csv.reader(f, delimiter=separator, quotechar='"')
-        fcsv_list = [a for a in fcsv]
-        for line_number, orig_values in enumerate(fcsv_list, start = 1):
+        for line_number, orig_values in enumerate(fcsv, start = 1):
             # get values
             # to be safe, append some extra elements to the end of the list
             values = orig_values + ["" for _ in range(10)]
