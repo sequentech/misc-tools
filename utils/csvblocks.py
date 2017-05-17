@@ -89,7 +89,8 @@ def csv_to_blocks(path, separator=",", strip_values=True):
 
     with open(path, mode='r', encoding="utf-8", errors='strict') as f:
         fcsv = csv.reader(f, delimiter=separator, quotechar='"')
-        for orig_values in fcsv:
+        fcsv_list = [a for a in fcsv]
+        for line_number, orig_values in enumerate(fcsv_list, start = 1):
             # get values
             # to be safe, append some extra elements to the end of the list
             values = orig_values + ["" for _ in range(10)]
@@ -133,12 +134,21 @@ def csv_to_blocks(path, separator=",", strip_values=True):
                     key = values[0].strip()
                     if len(key) != 0:
                         current_block['values'][key] = values[1]
+                        if 0 == len(str(values[1])):
+                            print("WARNING: Empty form value for key %s at line %i" \
+                                % (key, line_number))
                 elif current_block['type'] == "Table":
                     if headers == None:
                         # as we addeed some extra empty elements to the values,
                         # we use here split again
                         headers = orig_values
                     else:
+                        for vindex, zipped_value in enumerate(zip(headers, values), start=1):
+                            key = zipped_value[0]
+                            value = zipped_value[1]
+                            if len(key.strip()) > 0 and 0 == len(str(value)):
+                                print("WARNING: Empty table value for key %s at line %i, table index %i" \
+                                    % (key, line_number, vindex))
                         current_block['values'].append(
                           dict((key.strip(), value)
                               for key, value in zip(headers, values) if len(key.strip()) > 0))
