@@ -136,6 +136,7 @@ def csv_to_blocks(path, separator=",", strip_values=True):
                         if 0 == len(str(values[1])):
                             print("WARNING: Empty form value for key %s at line %i" \
                                 % (key, line_number))
+                            print("         Line values: " + str(orig_values))
                 elif current_block['type'] == "Table":
                     if headers == None:
                         # as we addeed some extra empty elements to the values,
@@ -148,6 +149,7 @@ def csv_to_blocks(path, separator=",", strip_values=True):
                             if len(key.strip()) > 0 and 0 == len(str(value)):
                                 print("WARNING: Empty table value for key %s at line %i, table index %i" \
                                     % (key, line_number, vindex))
+                                print("         Line values: " + str(orig_values))
                         current_block['values'].append(
                           dict((key.strip(), value)
                               for key, value in zip(headers, values) if len(key.strip()) > 0))
