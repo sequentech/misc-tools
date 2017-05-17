@@ -595,6 +595,20 @@ def post_process_results_config(
                         if i['is_woman'] and int(i['election_id']) == int(election_id)]
                 }
             ])
+        elif config["agora_results_config_parity"]["method"] == "desborda2":
+            cfg = config["agora_results_config_parity"]
+            withdrawls = []
+            if "tie_withdrawals" in election_config:
+                withdrawls = election_config['tie_withdrawals'][str(election_id)]
+            results_config.append([
+                "agora_results.pipes.desborda2.podemos_desborda2",
+                {
+                    "women_names":[
+                        i['answer_text'].replace("\"", "")
+                        for i in cfg['parity_list']
+                        if i['is_woman'] and int(i['election_id']) == int(election_id)]
+                }
+            ])
         elif config["agora_results_config_parity"]["method"] == "parity_zip_plurality_at_large":
             cfg = config["agora_results_config_parity"]
             results_config.append([
