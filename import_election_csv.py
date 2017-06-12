@@ -352,6 +352,9 @@ if __name__ == '__main__':
                     file_path = os.path.join(args.input_path, name)
                     blocks = csv_to_blocks(path=file_path, separator=separator)
                     election = blocks_to_election(blocks, config, args.add_to_id)
+                    
+                    if str(election['id']) + extension != name:
+                        print("WARNING: election id %i doesn't match filename %s" % (election['id'], name))
 
                     if not args.admin_format:
                         output_path = os.path.join(args.output_path, str(election['id']) + ".config.json")
@@ -386,6 +389,9 @@ if __name__ == '__main__':
             else:
                 blocks = csv_to_blocks(path=args.input_path, separator=separator)
                 election = blocks_to_election(blocks, config, args.add_to_id)
+
+                if str(election['id']) + extension != os.path.basename(args.input_path):
+                    print("WARNING: election id %i doesn't match filename %s" % (election['id'], os.path.basename(args.input_path)))
 
                 with open(args.output_path, mode='w', encoding="utf-8", errors='strict') as f:
                     f.write(serialize(election))
