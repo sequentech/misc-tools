@@ -27,6 +27,30 @@ from datetime import datetime, timedelta
 from utils.csvblocks import csv_to_blocks
 from utils.json_serialize import serialize
 
+
+def iget(d, key, default):
+    '''
+    Ignore-case get
+
+    This function makes a dict.get but there's no need for the key to be
+    exactly the same as the key in the dict. Before the real **get** we
+    look into the dict keys and find for this key ignoring the case so the
+    key param can differ from the dict key in lower or upper cases.
+
+    :param d: this is the dict to search in
+    :param key: this is the key to search
+    :param default: this is the default value to return if key isn't in the
+    dict
+    '''
+
+    real_key = key
+    keyl = key.lower()
+    for k in d.keys():
+        if k.lower() == keyl:
+            real_key = k
+    return d.get(real_key, default)
+
+
 BASE_ELECTION = {
     "id": -1,
     "title": "",
@@ -105,6 +129,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
 
     # convert blocks into a more convenient structure
     election = blocks[0]['values']
+
     blocks.pop(0)
     questions = []
 
@@ -215,6 +240,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "urls": [],
             "theme_css": "",
             "extra_options": parse_extra(q),
+            "show_login_link_on_home": parse_bool(iget(election, 'login link on home', False)),
         },
         "end_date": (start_date + timedelta(hours=int(get_def(election, 'Duration in hours', '24')))).isoformat() + ".001",
         "start_date": start_date.isoformat() + ".001",
