@@ -292,7 +292,7 @@ def waitForPublicKey():
             print(pk)
         except:
             print("* Could not retrieve public key " + str(cv.data))
-            print traceback.print_exc()
+            print(traceback.print_exc())
     else:
         print("* Timeout waiting for public key")
     cv.release()
