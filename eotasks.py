@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # This file is part of agora-tools.
-# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2014-2020  Agora Voting SL <contact@nvotes.com>
 
 # agora-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -104,7 +104,7 @@ def print_task_list(tasks):
 
           table.add_row([str(task.id)[:8], task.label, election, task.sender_url, task.created_date])
 
-    print table
+    print(table)
 
 def print_task(task):
     table = PrettyTable(header=False)
@@ -124,7 +124,7 @@ def print_task(task):
     table.add_row(["sender_url",  task.sender_url])
     table.add_row(["created_date", task.created_date])
 
-    print table
+    print(table)
 
 # local parser
 def process_parser(self, parser):
@@ -176,7 +176,7 @@ elif pargs.show:
     target_pargs = parser.parse_args(["--show-external", pargs.show])
     tasks = get_external_task(target_pargs)
     if not tasks:
-        print "task %s not found" % pargs.show
+        print("task %s not found" % pargs.show)
     else:
         task = tasks[0]
         print_task(task)
@@ -184,7 +184,7 @@ elif pargs.show_full:
     target_pargs = parser.parse_args(["--show-external", pargs.show_full])
     tasks = get_external_task(target_pargs)
     if not tasks:
-        print "task %s not found" % pargs.show
+        print("task %s not found" % pargs.show)
     else:
         task = tasks[0]
         print(json.dumps(tasks[0].input_data, indent=4))
