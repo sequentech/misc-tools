@@ -25,9 +25,11 @@ import random
 from functools import partial
 from base64 import urlsafe_b64encode
 
-import BaseHTTPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from http.server import (
+    BaseHTTPRequestHandler, 
+    HTTPServer, 
+    SimpleHTTPRequestHandler
+)
 from SocketServer import ThreadingMixIn
 import SocketServer
 import threading
@@ -187,7 +189,7 @@ def getStartData(eopeers_dir, mypeerpkg, eopeers):
 # thread signalling
 cv = threading.Condition()
 
-class ThreadingHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+class ThreadingHTTPServer(SocketServer.ThreadingMixIn, HTTPServer):
     pass
 
 class RequestHandler(SimpleHTTPRequestHandler):
