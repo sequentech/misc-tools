@@ -30,8 +30,7 @@ from http.server import (
     HTTPServer, 
     SimpleHTTPRequestHandler
 )
-from SocketServer import ThreadingMixIn
-import SocketServer
+from socketserver import ThreadingMixIn
 import threading
 
 import subprocess
@@ -72,8 +71,8 @@ class RejectAdapter(HTTPAdapter):
 def getPeerPkg(mypeerpkg):
     if mypeerpkg is None:
         mypeerpkg = subprocess.check_output(["/usr/bin/eopeers", "--show-mine"])
-    if isinstance(mypeerpkg, basestring):
-        return json.loads(mypeerpkg)
+    if isinstance(mypeerpkg, bytes):
+        return json.loads(mypeerpkg.decode("utf-8"))
     else:
         return mypeerpkg
 
@@ -189,7 +188,7 @@ def getStartData(eopeers_dir, mypeerpkg, eopeers):
 # thread signalling
 cv = threading.Condition()
 
-class ThreadingHTTPServer(SocketServer.ThreadingMixIn, HTTPServer):
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     pass
 
 class RequestHandler(SimpleHTTPRequestHandler):
