@@ -193,9 +193,11 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 
 class RequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
-        print("> HTTP received " + self.path)
+        print("> HTTP GET received " + self.path)
         if(self.path == "/exit"):
             self.send_response(204)
+            self.end_headers()
+            print("> HTTP GET sent response")
             cv.acquire()
             cv.done = True
             cv.notify()
@@ -205,12 +207,14 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers['Content-Length'])
-        print("> HTTP received " + self.path + " (" + str(length) + ")")
+        print("> HTTP POST received " + self.path + " (" + str(length) + ")")
         raw = self.rfile.read(length).decode('utf-8')
         data = json.loads(raw)
 
         # print(data)
         self.send_response(200)
+        self.end_headers()
+        print("> HTTP POST sent response")
         cv.acquire()
         cv.done = True
         cv.data = data
@@ -225,11 +229,11 @@ def hash_file(file_path):
     path.
     '''
     hash = hashlib.sha256()
-    f = open(os.path.join(DATA_DIR, file_path), 'r')
+    f = open(os.path.join(DATA_DIR, file_path), 'rb')
     for chunk in iter(partial(f.read, BUF_SIZE), b''):
         hash.update(chunk)
     f.close()
-    return urlsafe_b64encode(hash.digest())
+    return urlsafe_b64encode(hash.digest()).decode('utf-8')
 
 
 def writeVotes(votesData, fileName):
@@ -265,10 +269,9 @@ def writeVotes(votesData, fileName):
 def startServer(port):
     import ssl
     print("> Starting server on port " + str(port))
-    server = ThreadingHTTPServer(('', port),RequestHandler)
-    server.socket = ssl.wrap_socket (server.socket, certfile=CERT, keyfile=KEY, server_side=True)
-    thread = threading.Thread(target = server.serve_forever)
-    thread.daemon = True
+    server = ThreadingHTTPServer(('', port), RequestHandler)
+    server.socket = ssl.wrap_socket(server.socket, certfile=CERT, keyfile=KEY, server_side=True)
+    thread = threading.Thread(target = server.serve_forever, daemon=True)
     thread.start()
 
 def startElection(electionId, url, data):
