@@ -341,7 +341,7 @@ def downloadTally(url, electionId):
     path = os.path.join(DATA_DIR, fileName)
     print("> Downloading to %s" % path)
     with open(path, 'wb') as handle:
-        request = session.request('get',url, stream=True, verify=False, cert=(CERT, KEY))
+        request = session.request('get',url, stream=True, verify=CALIST, cert=(CERT, KEY))
 
         for block in request.iter_content(1024):
             if not block:
