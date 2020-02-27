@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This file is part of agora-tools.
-# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2014-2020  Agora Voting SL <contact@nvotes.com>
 
 # agora-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -25,11 +25,12 @@ import random
 from functools import partial
 from base64 import urlsafe_b64encode
 
-import BaseHTTPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-from SocketServer import ThreadingMixIn
-import SocketServer
+from http.server import (
+    BaseHTTPRequestHandler, 
+    HTTPServer, 
+    SimpleHTTPRequestHandler
+)
+from socketserver import ThreadingMixIn
 import threading
 
 import subprocess
@@ -70,8 +71,8 @@ class RejectAdapter(HTTPAdapter):
 def getPeerPkg(mypeerpkg):
     if mypeerpkg is None:
         mypeerpkg = subprocess.check_output(["/usr/bin/eopeers", "--show-mine"])
-    if isinstance(mypeerpkg, basestring):
-        return json.loads(mypeerpkg)
+    if isinstance(mypeerpkg, bytes):
+        return json.loads(mypeerpkg.decode("utf-8"))
     else:
         return mypeerpkg
 
@@ -187,14 +188,16 @@ def getStartData(eopeers_dir, mypeerpkg, eopeers):
 # thread signalling
 cv = threading.Condition()
 
-class ThreadingHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     pass
 
 class RequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
-        print("> HTTP received " + self.path)
+        print("> HTTP GET received " + self.path)
         if(self.path == "/exit"):
             self.send_response(204)
+            self.end_headers()
+            print("> HTTP GET sent response")
             cv.acquire()
             cv.done = True
             cv.notify()
@@ -204,12 +207,14 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers['Content-Length'])
-        print("> HTTP received " + self.path + " (" + str(length) + ")")
+        print("> HTTP POST received " + self.path + " (" + str(length) + ")")
         raw = self.rfile.read(length).decode('utf-8')
         data = json.loads(raw)
 
         # print(data)
         self.send_response(200)
+        self.end_headers()
+        print("> HTTP POST sent response")
         cv.acquire()
         cv.done = True
         cv.data = data
@@ -224,11 +229,11 @@ def hash_file(file_path):
     path.
     '''
     hash = hashlib.sha256()
-    f = open(os.path.join(DATA_DIR, file_path), 'r')
+    f = open(os.path.join(DATA_DIR, file_path), 'rb')
     for chunk in iter(partial(f.read, BUF_SIZE), b''):
         hash.update(chunk)
     f.close()
-    return urlsafe_b64encode(hash.digest())
+    return urlsafe_b64encode(hash.digest()).decode('utf-8')
 
 
 def writeVotes(votesData, fileName):
@@ -264,10 +269,9 @@ def writeVotes(votesData, fileName):
 def startServer(port):
     import ssl
     print("> Starting server on port " + str(port))
-    server = ThreadingHTTPServer(('', port),RequestHandler)
-    server.socket = ssl.wrap_socket (server.socket, certfile=CERT, keyfile=KEY, server_side=True)
-    thread = threading.Thread(target = server.serve_forever)
-    thread.daemon = True
+    server = ThreadingHTTPServer(('', port), RequestHandler)
+    server.socket = ssl.wrap_socket(server.socket, certfile=CERT, keyfile=KEY, server_side=True)
+    thread = threading.Thread(target = server.serve_forever, daemon=True)
     thread.start()
 
 def startElection(electionId, url, data):
@@ -292,7 +296,7 @@ def waitForPublicKey():
             print(pk)
         except:
             print("* Could not retrieve public key " + str(cv.data))
-            print traceback.print_exc()
+            print(traceback.print_exc())
     else:
         print("* Timeout waiting for public key")
     cv.release()
@@ -337,7 +341,7 @@ def downloadTally(url, electionId):
     path = os.path.join(DATA_DIR, fileName)
     print("> Downloading to %s" % path)
     with open(path, 'wb') as handle:
-        request = session.request('get',url, stream=True, verify=False, cert=(CERT, KEY))
+        request = session.request('get',url, stream=True, verify=CALIST, cert=(CERT, KEY))
 
         for block in request.iter_content(1024):
             if not block:
