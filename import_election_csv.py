@@ -103,6 +103,9 @@ BASE_ANSWER = {
     "text": ""
 }
 
+def parse_int(s):
+    return int(s)
+
 def parse_list(s):
     return s.split(",")
 
@@ -114,12 +117,19 @@ def parse_extra(q):
       (key.replace("extra: ", ""), value)
       for key, value in q.items() if key.startswith("extra: ")
   )
+  if "success_screen__hide_download_ballot_ticket" in val:
+      val["success_screen__hide_download_ballot_ticket"] = parse_bool(
+          val["success_screen__hide_download_ballot_ticket"]
+      )
   if "shuffle_category_list" in val:
       val["shuffle_category_list"] = parse_list(val["shuffle_category_list"])
   if "shuffle_categories" in val:
       val["shuffle_categories"] = parse_bool(val["shuffle_categories"])
   if "shuffle_all_options" in val:
       val["shuffle_all_options"] = parse_bool(val["shuffle_all_options"])
+  if "select_all_category_clicks" in val:
+      val["select_all_category_clicks"] = parse_int(val["select_all_category_clicks"])
+
   return val
 
 def blocks_to_election(blocks, config, add_to_id=0):
@@ -239,7 +249,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
             "theme": election.get('Theme', 'default'),
             "urls": [],
             "theme_css": "",
-            "extra_options": parse_extra(q),
+            "extra_options": parse_extra(election),
             "show_login_link_on_home": parse_bool(iget(election, 'login link on home', False)),
         },
         "end_date": (start_date + timedelta(hours=int(get_def(election, 'Duration in hours', '24')))).isoformat() + ".001",
