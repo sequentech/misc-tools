@@ -420,7 +420,12 @@ if __name__ == '__main__':
                                 mode='w',
                                 encoding="utf-8",
                                 errors='strict') as f:
-                            f.write(serialize(config['agora_results_config']))
+                            f.write(serialize(
+                                dict(
+                                    version="1.0",
+                                    pipes=config['agora_results_config']
+                                )
+                            )
                     i += i + 1
             else:
                 blocks = csv_to_blocks(path=args.input_path, separator=separator)
