@@ -20,14 +20,28 @@ def main():
         help="File with a list of volumes, one per line, example: file.csv"
     )
     parser.add_argument(
+        "--exclude-snap-ids",
+        nargs='*',
+        help="Ids from snapshot that will not be removed",
+        default=[]
+    )
+    parser.add_argument(
         "--remove-all",
         help="Force to remove all",
+        action="store_true"
+    )
+    parser.add_argument(
+        "--print-only",
+        help="Do not execute any action, just print what would be done",
         action="store_true"
     )
     pargs = parser.parse_args()
     vol_id = pargs.vol_id
     vol_list_file = pargs.vol_list_file
+    exclude_snap_ids = pargs.exclude_snap_ids
+    print_only = pargs.print_only
     remove_all = pargs.remove_all
+
     if not vol_id and not vol_list_file:
         parser.print_help()
         exit(1)
@@ -65,7 +79,8 @@ def main():
             for point in recovery_points_list
             if (
                 isinstance(point["Lifecycle"], dict) and
-                point["Lifecycle"]["DeleteAfterDays"] < 365
+                point["Lifecycle"]["DeleteAfterDays"] < 365 and
+                point['RecoveryPointArn'] not in exclude_snap_ids
             )
         ]
         long_recovery_points_list = [
@@ -81,13 +96,16 @@ def main():
         print("\nTo maintain:")
         print("\n".join(long_recovery_points_list))
 
-        if len(long_recovery_points_list) == 0:
+        if len(long_recovery_points_list) == 0 and not remove_all:
             print("Failing, no recovery point would be maintained")
             exit(1)
 
         print("\nStarting to remove:")
 
         # remove short recovery points
+        if print_only:
+            print("not removing anything as we are in print only mode")
+            exit(0)
         for point in short_recovery_points_list:
             cmd = [
                 "/usr/bin/aws",
