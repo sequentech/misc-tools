@@ -1,4 +1,4 @@
-SQLAlchemy==0.9.7
+SQLAlchemy==1.3.0
 argparse==1.2.1
 datadiff==1.1.6
 prettytable==0.7.2
