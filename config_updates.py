@@ -754,13 +754,14 @@ def write_agora_results_files(config, changes_path, elections_path, ids_path):
 
         epath = os.path.join(elections_path, "%s.config.results.json" % election_id)
         with open(epath, mode='w', encoding="utf-8", errors='strict') as f:
-            f.write(serialize(
+            f.write(
+                serialize(
                     dict(
                         version="1.0",
                         pipes=results_config
                     )
                 )
-            ))
+            )
 
 def hash_file(filePath):
     '''
