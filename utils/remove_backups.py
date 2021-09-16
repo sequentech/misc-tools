@@ -4,8 +4,6 @@ import json
 import argparse
 import subprocess
 
-BASE_ARN = "arn:aws:ec2:eu-west-1:498439606504:volume/"
-
 def main():
     '''
     Main function
@@ -14,6 +12,16 @@ def main():
     parser.add_argument(
         "--vol-id",
         help="Volume Id, example: vol-194f68ea"
+    )
+    parser.add_argument(
+        "--aws-bin-path",
+        help="Path to aws binary",
+        default="/usr/bin/aws"
+    )
+    parser.add_argument(
+        "--base-arn",
+        help="Base ARN",
+        default="arn:aws:ec2:eu-west-1:498439606504:volume/"
     )
     parser.add_argument(
         "--vol-list-file",
@@ -41,6 +49,8 @@ def main():
     exclude_snap_ids = pargs.exclude_snap_ids
     print_only = pargs.print_only
     remove_all = pargs.remove_all
+    base_arn = pargs.base_arn
+    aws_bin_path = pargs.aws_bin_path
 
     if not vol_id and not vol_list_file:
         parser.print_help()
@@ -49,19 +59,23 @@ def main():
         vol_list = [vol_id]
     else:
         with open(vol_list_file, 'r') as f:
-            vol_list = f.readlines().split('\n')
+            vol_list = [
+                line.replace("\n", "")
+                for line in open("vol-ids.txt", "r").readlines()
+                if len(line) > 0
+            ]
     
     for vol_id in vol_list:
         recovery_points_list_json = subprocess.check_output(
             [
-                "/usr/bin/aws",
+                aws_bin_path,
                 "backup",
                 "list-recovery-points-by-backup-vault",
                 "--backup-vault-name",
                 "Default",
                 "--by-resource-arn",
                 "%s%s" % (
-                    BASE_ARN,
+                    base_arn,
                     vol_id
                 )
             ]
@@ -108,7 +122,7 @@ def main():
             exit(0)
         for point in short_recovery_points_list:
             cmd = [
-                "/usr/bin/aws",
+                aws_bin_path,
                 "backup",
                 "delete-recovery-point",
                 "--backup-vault-name",
