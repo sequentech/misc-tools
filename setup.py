@@ -19,7 +19,7 @@ from setuptools import setup
 
 setup(
     name='agora-tools',
-    version='master',
+    version='5.0.0',
     author='Agora Voting SL',
     author_email='contact@nvotes.com',
     packages=[],
