@@ -425,8 +425,8 @@ if __name__ == '__main__':
                                     version="1.0",
                                     pipes=config['agora_results_config']
                                 )
-                            )
-                    i += i + 1
+                            ))
+                    i += 1
             else:
                 blocks = csv_to_blocks(path=args.input_path, separator=separator)
                 election = blocks_to_election(blocks, config, args.add_to_id)
