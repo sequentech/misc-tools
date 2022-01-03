@@ -129,6 +129,10 @@ def parse_extra(q):
       val["shuffle_all_options"] = parse_bool(val["shuffle_all_options"])
   if "select_all_category_clicks" in val:
       val["select_all_category_clicks"] = parse_int(val["select_all_category_clicks"])
+  if "answer_group_columns_size" in val:
+      val["answer_group_columns_size"] = parse_int(val["answer_group_columns_size"])
+  if "answer_columns_size" in val:
+      val["answer_columns_size"] = parse_int(val["answer_columns_size"])
 
   return val
 
