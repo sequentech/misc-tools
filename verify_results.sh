@@ -1,26 +1,26 @@
 #!/bin/bash
 
-# This file is part of agora-tools.
-# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
+# This file is part of misc-tools.
+# Copyright (C) 2014-2016  Sequent Tech Inc <legal@sequentech.io>
 
-# agora-tools is free software: you can redistribute it and/or modify
+# misc-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License.
 
-# agora-tools  is distributed in the hope that it will be useful,
+# misc-tools  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 
 # You should have received a copy of the GNU Affero General Public License
-# along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
+# along with misc-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 export TMP_DIR=/tmp/orig
-export AGORA_RESULTS_PATH=/home/agoraelections/agora-results
+export SEQUENT_RESULTS_PATH=/home/ballotbox/tally-pipes
 export BASE_TARS_URL=/srv/election-orchestra/server1/public/
-export TARS_PATH=/home/agoraelections/tars
+export TARS_PATH=/home/ballotbox/tars
 export TARFILE=$(realpath $1)
-export VIRTUALENV=/home/agoraelections/.virtualenvs/agora-tools
+export VIRTUALENV=/home/ballotbox/.virtualenvs/misc-tools
 
 if [ "$(whoami)" != "root" ]
 then
@@ -52,9 +52,9 @@ do
     fi
   fi
 
-  echo "executing '$AGORA_RESULTS_PATH/agora-results -c $TMP_DIR/${i}.config.results.json -t ${TARS_PATH}/${i}.tar.gz -s -o pretty'.."
+  echo "executing '$SEQUENT_RESULTS_PATH/tally-pipes -c $TMP_DIR/${i}.config.results.json -t ${TARS_PATH}/${i}.tar.gz -s -o pretty'.."
 
-  $AGORA_RESULTS_PATH/agora-results -c ${i}.config.results.json -t "${TARS_PATH}/${i}.tar.gz" -s -o pretty > "${i}.results.mine.pretty"
+  $SEQUENT_RESULTS_PATH/tally-pipes -c ${i}.config.results.json -t "${TARS_PATH}/${i}.tar.gz" -s -o pretty > "${i}.results.mine.pretty"
   [ $? != 0 ] && echo "error executing previous command" && exit 1
 
   my_md5=$(md5sum "${i}.results.mine.pretty" | cut -b-32)

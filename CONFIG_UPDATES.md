@@ -1,6 +1,6 @@
 # Config updates
 
-Sometimes, you have an election running, and unfortunately, you need to change the configuration. That shouldn't happen, but in practice it can happen. Usually, that means you need to start the election from the begining. That's a reasonable solution, but because in Agora Voting we want to be flexible, we want to provide alternatives in case you need them.
+Sometimes, you have an election running, and unfortunately, you need to change the configuration. That shouldn't happen, but in practice it can happen. Usually, that means you need to start the election from the begining. That's a reasonable solution, but because in Sequent Tech we want to be flexible, we want to provide alternatives in case you need them.
 
 These are the actions that we currently support:
 * Change question's maximum number of candidates that a user can choose and the number of winners candidates (1)
@@ -11,7 +11,7 @@ These are the actions that we currently support:
 
 More actions can be easily incorporated in the future as needed.
 
-Options marked with (1) mean that the change can be applied without creating a new election. This means that what needs to change is only the election configuration in for agora_elections, and the configuration used for calculating the results with agora-results.
+Options marked with (1) mean that the change can be applied without creating a new election. This means that what needs to change is only the election configuration in for ballot_box, and the configuration used for calculating the results with tally-pipes.
 
 Options marked with (2) mean that a new election is needed. In that case, the results of the two elections need to be consolidated to obtain the final results.
 
@@ -23,7 +23,7 @@ The config_updates.py script allows you to:
 
 This is useful if you have manually applied some updates. This script will check if the updates you have registered in the "updates CSV" are exactly the only updates applied, and if they have been applied.
 
-* generate or list the actions, commands, or configuration files to apply the updates in agora_election and agora-results
+* generate or list the actions, commands, or configuration files to apply the updates in sequent_election and tally-pipes
 
 Given an "updates CSV", it can generate list of actions that need to be taken for the yet unapplied changes. It can also generate the configuration files associated with the actions, and even list commands that need to be executed.
 
@@ -35,22 +35,22 @@ The format is very simple: A single table, with a list of columns describing som
 
 # Usage
 
-    mkvirtualenv agora-tools -p $(which python3)
-    workon agora-tools
+    mkvirtualenv misc-tools -p $(which python3)
+    workon misc-tools
     pip install -r requirements.txt
     config_updates.py -u updates.csv -c config.json --action check
-    config_updates.py -u updates.csv -c config.json --action show_agora_elections_commands
-    config_updates.py -u updates.csv -c config.json --action write_agora_results_files --dest-dir /tmp/agora-results-config
+    config_updates.py -u updates.csv -c config.json --action show_ballot_box_commands
+    config_updates.py -u updates.csv -c config.json --action write_tally_pipes_files --dest-dir /tmp/tally-pipes-config
 
 # Election results verification
 
-Once the election results have been calculated, a zip file with the results can be created which can be used by election authorities to reproduce the results. In order to create the zip, execute on an agora server, from user agoraelections, on agora-tools:
+Once the election results have been calculated, a zip file with the results can be created which can be used by election authorities to reproduce the results. In order to create the zip, execute on an sequent server, from user ballotbox, on misc-tools:
 
     python3 config_updates.py -c config/config_example.json -e /path/to/folder -i /path/to/election-ids.txt -p <PASSWORD> -a create_verifiable_results
 
 This will create a zip file called verify.zip on path /path/to/folder with password <PASSWORD>, for elections with the election ids listed on file /path/to/election-ids.txt
 
-Then, copy verify.zip to an election authority, and unzip it on a folder (example: /path/to/folder) and, from user eorchestra, on /home/eorchestra/agora-tools, execute:
+Then, copy verify.zip to an election authority, and unzip it on a folder (example: /path/to/folder) and, from user eorchestra, on /home/eorchestra/misc-tools, execute:
 
      $ python3 config_updates.py -e /path/to/folder -a verify_results
 
