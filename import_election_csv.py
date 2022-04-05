@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# This file is part of agora-tools.
-# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
+# This file is part of misc-tools.
+# Copyright (C) 2014-2016  Sequent Tech Inc <legal@sequentech.io>
 
-# agora-tools is free software: you can redistribute it and/or modify
+# misc-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License.
 
-# agora-tools  is distributed in the hope that it will be useful,
+# misc-tools  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 
 # You should have received a copy of the GNU Affero General Public License
-# along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
+# along with misc-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
 import csv
@@ -61,7 +61,7 @@ BASE_ELECTION = {
         {
           "network": "Twitter",
           "button_text": "",
-          "social_message": "I have just voted in election __URL__, you can too! #nvotes"
+          "social_message": "I have just voted in election __URL__, you can too! #sequent"
         },
         {
           "network": "Facebook",
@@ -155,7 +155,7 @@ def blocks_to_election(blocks, config, add_to_id=0):
 
     def get_url(key, value):
         if key in ['Gender', 'Tag', 'Support']:
-            return "https://agoravoting.com/api/%s/%s" % (key.lower(), value)
+            return "https://sequentech.io/api/%s/%s" % (key.lower(), value)
         elif value.startswith('http://') or value.startswith('https://'):
             return value.strip()
 
@@ -277,7 +277,7 @@ def form_to_elections(path, separator, config, add_to_id):
     more_keys = {
         "¿Más preguntas?": lambda v: "No" not in v
     }
-    auth_method = config['authapi']['event_config']['auth_method']
+    auth_method = config['iam']['event_config']['auth_method']
     question_options_key = "Opciones"
     question_funcs = {
         "Título": lambda d: ["title", d],
@@ -345,7 +345,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--config-path', help='default config for the election')
     parser.add_argument('-i', '--input-path', help='input file or directory')
     parser.add_argument('-o', '--output-path', help='output file or directory')
-    parser.add_argument('-A', '--admin-format', help='use create format for agora-admin instead of agora-elections', action="store_true")
+    parser.add_argument('-A', '--admin-format', help='use create format for sequent-admin instead of ballot-box', action="store_true")
     parser.add_argument('-a', '--add-to-id', type=int, help='add an int number to the id', default=0)
     parser.add_argument(
         '-f', '--format',
@@ -401,12 +401,12 @@ if __name__ == '__main__':
                     else:
                         output_path = os.path.join(args.output_path, str(i) + ".json")
                         auth_config_path = os.path.join(args.output_path, str(i) + ".config.json")
-                        auth_config = config['authapi']['event_config']
+                        auth_config = config['iam']['event_config']
                         with open(auth_config_path, mode='w', encoding="utf-8", errors='strict') as f:
                             f.write(serialize(auth_config))
 
                         auth_census_path = os.path.join(args.output_path, str(i) + ".census.json")
-                        census_config = config['authapi'].get('census_data', [])
+                        census_config = config['iam'].get('census_data', [])
                         with open(auth_census_path, mode='w', encoding="utf-8", errors='strict') as f:
                             f.write(serialize(census_config))
 
@@ -414,7 +414,7 @@ if __name__ == '__main__':
                     with open(output_path, mode='w', encoding="utf-8", errors='strict') as f:
                         f.write(serialize(election))
 
-                    if config.get('agora_results_config', None) is not None:
+                    if config.get('tally_pipes_config', None) is not None:
                         if not args.admin_format:
                             results_conf_path = os.path.join(args.output_path, str(election['id']) + ".config.results.json")
                         else:
@@ -427,7 +427,7 @@ if __name__ == '__main__':
                             f.write(serialize(
                                 dict(
                                     version="1.0",
-                                    pipes=config['agora_results_config']
+                                    pipes=config['tally_pipes_config']
                                 )
                             ))
                     i += 1
@@ -463,7 +463,7 @@ if __name__ == '__main__':
 
                 fpath = os.path.join(args.output_path, "%d.config.json" % election["id"])
                 with open(fpath, mode='w', encoding="utf-8", errors='strict') as f:
-                    f.write(serialize(config['authapi']['event_config']))
+                    f.write(serialize(config['iam']['event_config']))
     except:
         print("malformed CSV")
         import traceback

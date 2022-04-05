@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
-# This file is part of agora-tools.
-# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
+# This file is part of misc-tools.
+# Copyright (C) 2014-2016  Sequent Tech Inc <legal@sequentech.io>
 
-# agora-tools is free software: you can redistribute it and/or modify
+# misc-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License.
 
-# agora-tools  is distributed in the hope that it will be useful,
+# misc-tools  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 
 # You should have received a copy of the GNU Affero General Public License
-# along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
+# along with misc-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 import requests
 import json
@@ -700,7 +700,7 @@ def __load_node_votes(cfg):
     print("> inserted %d votes" % len(vs))
 
 def main(argv):
-    parser = argparse.ArgumentParser(description='agora-api admin script', formatter_class=RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description='sequent-api admin script', formatter_class=RawTextHelpFormatter)
     parser.add_argument('command', nargs='+', help='''create <election_dir>: creates an election
 tally <election_dir>: launches tally
 list_votes <election_dir>: list votes

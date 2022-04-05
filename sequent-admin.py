@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 
-# This file is part of agora-tools.
-# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
+# This file is part of misc-tools.
+# Copyright (C) 2014-2016  Sequent Tech Inc <legal@sequentech.io>
 
-# agora-tools is free software: you can redistribute it and/or modify
+# misc-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License.
 
-# agora-tools  is distributed in the hope that it will be useful,
+# misc-tools  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 
 # You should have received a copy of the GNU Affero General Public License
-# along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
+# along with misc-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
 import os
@@ -65,9 +65,9 @@ def request_delete(url, *args, **kwargs):
 def login():
     """ Login and return the neccesary headers """
     global headers
-    base_url = ADMIN_CONFIG['authapi']['url']
-    event_id = ADMIN_CONFIG['authapi']['event-id']
-    credentials = copy.deepcopy(ADMIN_CONFIG['authapi']['credentials'])
+    base_url = ADMIN_CONFIG['iam']['url']
+    event_id = ADMIN_CONFIG['iam']['event-id']
+    credentials = copy.deepcopy(ADMIN_CONFIG['iam']['credentials'])
     req = request_post(base_url + 'auth-event/%d/authenticate/' % event_id,
         data=json.dumps(credentials))
     if req.status_code != 200:
@@ -81,7 +81,7 @@ def getperm(obj_type, perm, obj_id=None):
     """ Check if the user have permission """
     global headers
     global KHMAC
-    base_url = ADMIN_CONFIG['authapi']['url']
+    base_url = ADMIN_CONFIG['iam']['url']
     perms = {"object_type": obj_type, "permission": perm}
     if obj_id:
         perms['object_id'] = obj_id
@@ -98,7 +98,7 @@ def createAuthevent(config):
     Return the id of created authevent.
     """
     global headers
-    base_url = ADMIN_CONFIG['authapi']['url']
+    base_url = ADMIN_CONFIG['iam']['url']
     req = request_post(base_url + 'auth-event/', data=json.dumps(config),
         headers=headers)
     if req.status_code != 200:
@@ -113,7 +113,7 @@ def addCensus(aeid, census):
     Return ok if added correct or the user errors if added wrong.
     """
     global headers
-    base_url = ADMIN_CONFIG['authapi']['url']
+    base_url = ADMIN_CONFIG['iam']['url']
     req = request_post(base_url + 'auth-event/%d/census/' % aeid, data=json.dumps(census),
             headers=headers)
     if req.status_code != 200:
@@ -128,7 +128,7 @@ def statusAuthevent(aeid, status):
     Return ok if change correct or error if not status changed.
     """
     global headers
-    base_url = ADMIN_CONFIG['authapi']['url']
+    base_url = ADMIN_CONFIG['iam']['url']
     req = request_post(base_url + 'auth-event/%d/%s/' % (aeid, status),
             headers=headers)
     if req.status_code == 200:
@@ -142,7 +142,7 @@ def send_auth_codes(aeid, subject=None, msg=None):
     '''
     print("S", subject, msg)
     global headers
-    base_url = ADMIN_CONFIG['authapi']['url']
+    base_url = ADMIN_CONFIG['iam']['url']
     payload = {}
     if subject:
         payload['subject'] = subject
@@ -153,10 +153,10 @@ def send_auth_codes(aeid, subject=None, msg=None):
 
 def createElection(config, aeid):
     '''
-    Create election on agora-elections
+    Create election on ballot-box
     '''
     global KHMAC
-    base_url = ADMIN_CONFIG['agora_elections_base_url']
+    base_url = ADMIN_CONFIG['ballot_box_base_url']
     headers = {'content-type': 'application/json', 'Authorization': KHMAC}
     url = '%selection/%d' % (base_url, aeid)
     # register
@@ -169,7 +169,7 @@ def createElection(config, aeid):
 
 def electionCommand(aeid, command, method="POST", data=None):
     global KHMAC
-    base_url = ADMIN_CONFIG['agora_elections_base_url']
+    base_url = ADMIN_CONFIG['ballot_box_base_url']
     headers = {'content-type': 'application/json', 'Authorization': KHMAC}
     url = '%selection/%d/%s' % (base_url, aeid, command)
     method = request_post if method == "POST" else request_get
@@ -193,7 +193,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--create",
             help="path to the dir containing json configuration.")
     parser.add_argument("-C", "--config", required=True,
-            help="path to the agora-admin configuration file.")
+            help="path to the sequent-admin configuration file.")
     parser.add_argument("--start", type=check_positive_id,
             help="id authevent for start")
     parser.add_argument("--stop", type=check_positive_id,
@@ -246,8 +246,8 @@ if __name__ == "__main__":
             json_config = loadJson(os.path.join(args.create, config))
 
             # modify email title
-            json_config['auth_method'] = ADMIN_CONFIG['authapi']['event_config']['auth_method']
-            json_config['auth_method_config'] = copy.deepcopy(ADMIN_CONFIG['authapi']['event_config']['auth_method_config'])
+            json_config['auth_method'] = ADMIN_CONFIG['iam']['event_config']['auth_method']
+            json_config['auth_method_config'] = copy.deepcopy(ADMIN_CONFIG['iam']['event_config']['auth_method_config'])
             if "subject" in json_config['auth_method_config']:
                 json_config['auth_method_config']['subject'] = json_config['auth_method_config']['subject'] % dict(
                     title=json_ae['title'])
@@ -283,7 +283,7 @@ if __name__ == "__main__":
     elif args.calculate:
         headers = login()
         getperm(obj_type="AuthEvent", perm="edit", obj_id=args.calculate)
-        data = ADMIN_CONFIG['agora_results_config']
+        data = ADMIN_CONFIG['tally_pipes_config']
         electionCommand(args.calculate, "calculate-results", data=data)
     elif args.results:
         headers = login()
@@ -302,7 +302,7 @@ if __name__ == "__main__":
         headers = login()
 
         eid = args.voters
-        base_url = ADMIN_CONFIG['authapi']['url']
+        base_url = ADMIN_CONFIG['iam']['url']
         url = '%sauth-event/%s/census/' % (base_url, eid)
         req = request_get(url, data=json.dumps({}), headers=headers)
         if req.status_code != 200:

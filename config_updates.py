@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# This file is part of agora-tools.
-# Copyright (C) 2014-2016  Agora Voting SL <agora@agoravoting.com>
+# This file is part of misc-tools.
+# Copyright (C) 2014-2016  Sequent Tech Inc <legal@sequentech.io>
 
-# agora-tools is free software: you can redistribute it and/or modify
+# misc-tools is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License.
 
-# agora-tools  is distributed in the hope that it will be useful,
+# misc-tools  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 
 # You should have received a copy of the GNU Affero General Public License
-# along with agora-tools.  If not, see <http://www.gnu.org/licenses/>.
+# along with misc-tools.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
 import os
@@ -198,9 +198,9 @@ def create_verifiable_results(config, elections_path, ids_path, tallies_path, pa
 
     def save_config(config, temp_path):
         # change variables to be compatible with authorities
-        config["authapi"]["credentials"]["password"] = "REDACTED"
-        config["agora_results_bin_path"] = "/home/eorchestra/agora-tools/results.sh"
-        config["agora_elections_private_datastore_path"] = "/srv/election-orchestra/server1/public/"
+        config["iam"]["credentials"]["password"] = "REDACTED"
+        config["tally_pipes_bin_path"] = "/home/eorchestra/misc-tools/results.sh"
+        config["ballot_box_private_datastore_path"] = "/srv/election-orchestra/server1/public/"
         _write_file(os.path.join(temp_path, 'election_config.json'), _serialize(config))
 
     def create_zip(temp_path, tallies_path, password):
@@ -250,7 +250,7 @@ def download_elections(config, changes_path, elections_path, ids_path):
     election_ids.sort()
 
     headers = {'content-type': 'application/json'}
-    base_url = config['agora_elections_base_url']
+    base_url = config['ballot_box_base_url']
 
     # retrieve and save each election config
     for election_id in election_ids:
@@ -402,8 +402,8 @@ def check_changes(config, changes_path, elections_path, ids_path):
         check_diff_changes(elections_path, election_id, calculated_election)
 
         # check that all final elections have been tagged with the sex
-        if "agora_results_config_parity" in config:
-            cfg = config["agora_results_config_parity"]
+        if "tally_pipes_config_parity" in config:
+            cfg = config["tally_pipes_config_parity"]
             names = dict([
                 (i['answer_text'], i['is_woman'])
                 for i in cfg['parity_list']
@@ -523,16 +523,16 @@ def post_process_results_config(
     # first check for size corrections
     if 'max_winners_mapping' in election_config:
         results_config.insert(0, [
-            "agora_results.pipes.multipart.election_max_size_corrections",
+            "tally_pipes.pipes.multipart.election_max_size_corrections",
             {"corrections": election_config['max_winners_mapping']}
         ])
 
     # check if multipart tallying needs to happen
     if len(ancestors) > 1:
-        # the first element of the agora_results config (before the do_tallies)
+        # the first element of the tally_pipes config (before the do_tallies)
         # should be a make_multipart with the list of ancestors
         results_config.insert(0, [
-            "agora_results.pipes.multipart.make_multipart",
+            "tally_pipes.pipes.multipart.make_multipart",
             {"election_ids": [int(ancestor) for ancestor in ancestors]}
         ])
 
@@ -550,28 +550,28 @@ def post_process_results_config(
                 mappings = mappings + answer_mappings
 
         results_config.append([
-            "agora_results.pipes.multipart.question_totals_with_corrections",
+            "tally_pipes.pipes.multipart.question_totals_with_corrections",
             {"mappings": qmappings}
         ])
 
         results_config.append([
-            "agora_results.pipes.multipart.reduce_answers_with_corrections",
+            "tally_pipes.pipes.multipart.reduce_answers_with_corrections",
             {"mappings": mappings}
         ])
 
     # add sorting if needed
-    if "agora_results_config_sorting" in config:
-        results_config[:] = results_config + config["agora_results_config_sorting"]
+    if "tally_pipes_config_sorting" in config:
+        results_config[:] = results_config + config["tally_pipes_config_sorting"]
 
     # add parity at the end
-    if "agora_results_config_parity" in config:
-        if config["agora_results_config_parity"]["method"] == "podemos_proportion_rounded_and_duplicates":
-            cfg = config["agora_results_config_parity"]
+    if "tally_pipes_config_parity" in config:
+        if config["tally_pipes_config_parity"]["method"] == "podemos_proportion_rounded_and_duplicates":
+            cfg = config["tally_pipes_config_parity"]
             withdrawls = []
             if "tie_withdrawals" in election_config:
                 withdrawls = election_config['tie_withdrawals'][str(election_id)]
             results_config.append([
-                "agora_results.pipes.podemos.podemos_proportion_rounded_and_duplicates",
+                "tally_pipes.pipes.podemos.podemos_proportion_rounded_and_duplicates",
                 {
                     "women_names":[
                         i['answer_text']
@@ -581,13 +581,13 @@ def post_process_results_config(
                     "withdrawed_candidates": withdrawls
                 }
             ])
-        elif config["agora_results_config_parity"]["method"] == "desborda":
-            cfg = config["agora_results_config_parity"]
+        elif config["tally_pipes_config_parity"]["method"] == "desborda":
+            cfg = config["tally_pipes_config_parity"]
             withdrawls = []
             if "tie_withdrawals" in election_config:
                 withdrawls = election_config['tie_withdrawals'][str(election_id)]
             results_config.append([
-                "agora_results.pipes.desborda.podemos_desborda",
+                "tally_pipes.pipes.desborda.podemos_desborda",
                 {
                     "women_names":[
                         i['answer_text'].replace("\"", "")
@@ -595,13 +595,13 @@ def post_process_results_config(
                         if i['is_woman'] and int(i['election_id']) == int(election_id)]
                 }
             ])
-        elif config["agora_results_config_parity"]["method"] == "desborda2":
-            cfg = config["agora_results_config_parity"]
+        elif config["tally_pipes_config_parity"]["method"] == "desborda2":
+            cfg = config["tally_pipes_config_parity"]
             withdrawls = []
             if "tie_withdrawals" in election_config:
                 withdrawls = election_config['tie_withdrawals'][str(election_id)]
             results_config.append([
-                "agora_results.pipes.desborda2.podemos_desborda2",
+                "tally_pipes.pipes.desborda2.podemos_desborda2",
                 {
                     "women_names":[
                         i['answer_text'].replace("\"", "")
@@ -609,10 +609,10 @@ def post_process_results_config(
                         if i['is_woman'] and int(i['election_id']) == int(election_id)]
                 }
             ])
-        elif config["agora_results_config_parity"]["method"] == "parity_zip_plurality_at_large":
-            cfg = config["agora_results_config_parity"]
+        elif config["tally_pipes_config_parity"]["method"] == "parity_zip_plurality_at_large":
+            cfg = config["tally_pipes_config_parity"]
             results_config.append([
-                "agora_results.pipes.parity.parity_zip_plurality_at_large",
+                "tally_pipes.pipes.parity.parity_zip_plurality_at_large",
                 {
                     "women_names": cfg['parity_list']
                 }
@@ -652,13 +652,13 @@ def parse_parity_config(config):
     '''
     parses parity config
     '''
-    if "agora_results_config_parity" in config:
+    if "tally_pipes_config_parity" in config:
         parity_list = []
-        if config["agora_results_config_parity"]["method"] in [
+        if config["tally_pipes_config_parity"]["method"] in [
             "podemos_proportion_rounded_and_duplicates",
             "desborda"
           ]:
-            path = config["agora_results_config_parity"]['sexes_tsv']
+            path = config["tally_pipes_config_parity"]['sexes_tsv']
             with open(path, mode='r', encoding="utf-8", errors='strict') as f:
                 for line in f:
                     line = line.strip()
@@ -673,10 +673,10 @@ def parse_parity_config(config):
                 for line in f:
                     answer_text = line.strip()
                     parity_list.append(answer_text)
-        config["agora_results_config_parity"]['parity_list'] = parity_list
+        config["tally_pipes_config_parity"]['parity_list'] = parity_list
 
 
-def write_agora_results_files(config, changes_path, elections_path, ids_path):
+def write_tally_pipes_files(config, changes_path, elections_path, ids_path):
     '''
     Checks that the configuration set
     '''
@@ -731,7 +731,7 @@ def write_agora_results_files(config, changes_path, elections_path, ids_path):
     for election_id in final_ids:
         election_config = hashed_election_configs[election_id]['config']
         ancestors = hashed_election_configs[election_id]['ancestors']
-        results_config = copy.deepcopy(config['agora_results_config'])
+        results_config = copy.deepcopy(config['tally_pipes_config'])
 
         # apply first global_prechanges
         for change, kwargs in config['global_prechanges']:
@@ -793,14 +793,14 @@ def create_pdf(election_id, cfg_res_postfix, elections_path, bin_path, oformat, 
 
 def generate_pdf(config, tree_path, elections_path):
     '''
-    Launches agora-results to generate a pdf for those elections that do 
+    Launches tally-pipes to generate a pdf for those elections that do 
     have a tally
     '''
     with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
         tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
 
-    priv_path = config["agora_elections_private_datastore_path"]
-    bin_path = config['agora_results_bin_path']
+    priv_path = config["ballot_box_private_datastore_path"]
+    bin_path = config['tally_pipes_bin_path']
     cfg_res_postfix = '.config.results.json'
 
     for eids in tree:
@@ -824,7 +824,7 @@ def generate_pdf(config, tree_path, elections_path):
 
 def calculate_results(config, tree_path, elections_path, check):
     '''
-    Launches agora-results for those elections that do have a tally
+    Launches tally-pipes for those elections that do have a tally
     '''
     cfg_res_postfix = '.config.results.json'
     ids_w_res_config = [
@@ -835,7 +835,7 @@ def calculate_results(config, tree_path, elections_path, check):
     with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
         tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
 
-    priv_path = config["agora_elections_private_datastore_path"]
+    priv_path = config["ballot_box_private_datastore_path"]
     for eids in tree:
         # check for config file
         last_id = eids[-1]
@@ -878,7 +878,7 @@ def calculate_results(config, tree_path, elections_path, check):
                 print(cmd)
                 subprocess.check_call(cmd, stdout=f, stderr=sys.stderr, shell=True)
 
-        bin_path = config['agora_results_bin_path']
+        bin_path = config['tally_pipes_bin_path']
         create_results(last_id, cfg_res_postfix, elections_path, bin_path, "json", only_check=check)
         if not check:
             create_pdf(last_id, cfg_res_postfix, elections_path, bin_path, "pdf", tallies)
@@ -957,7 +957,7 @@ def count_votes(config, tree_path):
     '''
     Counts votes per election id and in total
     '''
-    priv_path = config["agora_elections_private_datastore_path"]
+    priv_path = config["ballot_box_private_datastore_path"]
 
     with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
         tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
@@ -1019,7 +1019,7 @@ def tar_tallies(config, tree_path, elections_path, tallies_path):
     '''
     Tars the tallies conveniently
     '''
-    priv_path = config["agora_elections_private_datastore_path"]
+    priv_path = config["ballot_box_private_datastore_path"]
 
     with open(tree_path, mode='r', encoding="utf-8", errors='strict') as f:
         tree = [[int(a.strip()) for a in line.strip().split(",")] for line in f]
@@ -1113,7 +1113,7 @@ if __name__ == '__main__':
             'print_all_with_others_ids',
             'download_elections',
             'check_changes',
-            'write_agora_results_files',
+            'write_tally_pipes_files',
             'calculate_results',
             'verify_results',
             'create_verifiable_results',
@@ -1180,9 +1180,9 @@ if __name__ == '__main__':
             tar_tallies(config, args.tree_path, args.elections_path, args.tallies_path)
         elif args.action == 'count_votes':
             count_votes(config, args.tree_path)
-        elif args.action == 'write_agora_results_files':
+        elif args.action == 'write_tally_pipes_files':
             elections_path_check(os.W_OK)
-            write_agora_results_files(config, args.changes_path, args.elections_path, args.ids_path)
+            write_tally_pipes_files(config, args.changes_path, args.elections_path, args.ids_path)
         elif 'zip_tallies' == args.action:
             zip_tallies(config, args.tree_path, args.elections_path, args.tallies_path, args.password)
         elif 'generate_pdf' == args.action:

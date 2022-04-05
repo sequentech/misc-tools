@@ -10,21 +10,21 @@ election:
 
     python3 import_election_csv.py --config config/config_example.json -i config/test.csv -o config/test-dir -f csv-google-forms
 
-# agora-admin.py script
+# sequent-admin.py script
 
 ## Introduction
 
-Script to manage elections using both agora-elections and authapi together. It
+Script to manage elections using both ballot-box and iam together. It
 allows to:
   - create an election with a census
-  - start or stop the election in authapi
+  - start or stop the election in iam
   - send auth messages to the census
 
 This script does not (currently) pretend to allow to do all the actions related
-to agora-elections or authapi, only those related to authapi. In cases those
-actions are also related to agora-elections and if it makes sense, like creating
+to ballot-box or iam, only those related to iam. In cases those
+actions are also related to ballot-box and if it makes sense, like creating
 an election in both, then it allows that. But the admin/admin.py script from
-agora-elections still manages other agora-elections specific tasks like doing
+ballot-box still manages other ballot-box specific tasks like doing
 a tally, for example.
 
 ## Plugin system
@@ -37,16 +37,16 @@ arguments and functions that execute this arguments. There is a example in plugi
 For any of the actions, you need to provide the --config file (see
 config/config_example.json for an example):
 
-    ./agora-admin --config config/config_example.json
+    ./sequent-admin --config config/config_example.json
 
-This configuration file format is shared/global with other agora-tools commands
+This configuration file format is shared/global with other misc-tools commands
 like import_election_csv.py or config_updates.py
 
 Then you execute any of the actions:
 
 ### Create elections
 
-To create an election with a census both in agora-elections and authapi, you
+To create an election with a census both in ballot-box and iam, you
 need to provide a directory with numbered files so that for each election you
 have 3 files: **id**.json, **id**.census.json and **id**.config.json. These
 files can be generated with the  import_election_csv.py script or by other
@@ -55,31 +55,31 @@ means. For example:
     $ ls data/example
     781.json 781.json 781.config.json
 
-    $ ./agora-admin.py --config config/config_example.json --create data/example
+    $ ./sequent-admin.py --config config/config_example.json --create data/example
 
 Note that the ids of the files are only to attach the files together, because
-the id is actually set on creation by authapi and printed on screen.
+the id is actually set on creation by iam and printed on screen.
 
 # Start or stop an election
 
-You can start or stop an election in authapi following this example:
+You can start or stop an election in iam following this example:
 
-    $ ./agora-admin.py --config config/config_example.json --start id
-    $ ./agora-admin.py --config config/config_example.json --stop id
+    $ ./sequent-admin.py --config config/config_example.json --start id
+    $ ./sequent-admin.py --config config/config_example.json --stop id
 
 # Send authentication codes to census
 
 To send the authentication codes to the census using the message format
 specified in the config file, use:
 
-    $ ./agora-admin.py --config config/config_example.json --send-auth-codes id
+    $ ./sequent-admin.py --config config/config_example.json --send-auth-codes id
 
 ### Agora admin complete election:
 
-    $ ./agora-admin.py -C vota1.config.json -c data/vota1/
-    $ ./agora-admin.py -C vota1.config.json --start ID
-    $ ./agora-admin.py -C vota1.config.json --send-auth-codes ID
-    $ ./agora-admin.py -C vota1.config.json --stop ID
-    $ ./agora-admin.py -C vota1.config.json --tally ID
-    $ ./agora-admin.py -C vota1.config.json --calculate ID
-    $ ./agora-admin.py -C vota1.config.json --publish ID
+    $ ./sequent-admin.py -C vota1.config.json -c data/vota1/
+    $ ./sequent-admin.py -C vota1.config.json --start ID
+    $ ./sequent-admin.py -C vota1.config.json --send-auth-codes ID
+    $ ./sequent-admin.py -C vota1.config.json --stop ID
+    $ ./sequent-admin.py -C vota1.config.json --tally ID
+    $ ./sequent-admin.py -C vota1.config.json --calculate ID
+    $ ./sequent-admin.py -C vota1.config.json --publish ID

@@ -1,21 +1,21 @@
 {
-  "director": "agora-auth5",
+  "director": "sequent-auth5",
   "authorities": ["openkratio-auth2"],
-  "agora_results_config": [
+  "tally_pipes_config": [
     [
-      "agora_results.pipes.results.do_tallies",
+      "tally_pipes.pipes.results.do_tallies",
       {"ignore_invalid_votes": true}
     ]
   ],
-  "agora_results_config_sorting": [
+  "tally_pipes_config_sorting": [
     [
-      "agora_results.pipes.sort.sort_non_iterative",
+      "tally_pipes.pipes.sort.sort_non_iterative",
       {"question_indexes": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}
     ]
   ],
-  "agora_elections_base_url": "http://localhost:9000/api",
-  "agora_results_bin_path": "/home/agoraelections/agora-tools/agora_results.sh",
-  "agora_elections_private_datastore_path": "/home/agoraelections/datastore/private/",
+  "ballot_box_base_url": "http://localhost:9000/api",
+  "tally_pipes_bin_path": "/home/ballotbox/misc-tools/tally_pipes.sh",
+  "ballot_box_private_datastore_path": "/home/ballotbox/datastore/private/",
   "global_prechanges": [
     [
       "map_question_maximums_and_winners",
@@ -24,7 +24,7 @@
       }
     ]
   ],
-  "authapi": {
+  "iam": {
     "credentials": {
       "username": "admin",
       "password": "admin"
