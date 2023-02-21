@@ -19,7 +19,7 @@ from setuptools import setup
 
 setup(
     name='misc-tools',
-    version='7.1.1',
+    version='7.2.0',
     author='Sequent Tech Inc',
     author_email='legal@sequentech.io',
     packages=[],
