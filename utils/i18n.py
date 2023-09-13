@@ -6,7 +6,7 @@ import argparse
 def update_items(key, base, i18n, filtered):
     typeof = type(base[key])
     if isinstance(base[key], str):
-        filtered[key] = i18n
+        filtered[key] = i18n[key]
     else:
         filtered[key] = dict()
         for key2, _ in base[key].items():
