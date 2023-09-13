@@ -3,21 +3,24 @@
 import json
 import argparse
 
-def update_items(key, base, i18n):
+def update_items(key, base, i18n, filtered):
+    typeof = type(base[key])
     if isinstance(base[key], str):
-        base[key] = i18n
+        filtered[key] = i18n
     else:
-        for key, _ in base.items():
-            if key in i18n:
-                update_items(key, base, i18n[key])
+        filtered[key] = dict()
+        for key2, _ in base[key].items():
+            if key2 in i18n[key]:
+                update_items(key2, base[key], i18n[key], filtered[key])
 
 def run(base_path, i18n_path, out_path):
     base = json.loads(open(base_path).read())
     i18n = json.loads(open(i18n_path).read())
+    filtered = dict()
     for key, _ in base.items():
         if key in i18n:
-            update_items(key, base, i18n[key])
-    open(out_path,mode="w").write(json.dumps(base, indent=2,sort_keys=True))
+            update_items(key, base, i18n, filtered)
+    open(out_path,mode="w").write(json.dumps(filtered, indent=2,sort_keys=True))
 
 def main():
     '''
