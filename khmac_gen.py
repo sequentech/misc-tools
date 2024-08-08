@@ -21,12 +21,16 @@ import time
 import hmac
 
 def get_auth_khmac(secret, userid, obj_type, obj_id, perm):
+    now = int(time.time())
+    expiry = now + 300
     message = ":".join([
         userid,
         obj_type,
         obj_id,
         perm,
-        str(int(time.time()))])
+        str(expiry),
+        "timeout-token",
+        str(now)])
     return get_khmac(secret, message)
 
 def get_khmac(secret, message):
