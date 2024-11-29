@@ -33,7 +33,7 @@ setup(
         'argparse==1.2.1',
         'datadiff==1.1.6',
         'prettytable==0.7.2',
-        'requests==2.31.0',
+        'requests==2.32.0',
         'pyminizip==0.2.4'
     ]
 )
